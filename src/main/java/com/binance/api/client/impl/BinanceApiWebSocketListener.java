@@ -36,6 +36,7 @@ public class BinanceApiWebSocketListener<T> extends WebSocketListener {
 
   @Override
   public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+//@to be extended in case of java.net.SocketException
     throw new BinanceApiException(t);
   }
 }

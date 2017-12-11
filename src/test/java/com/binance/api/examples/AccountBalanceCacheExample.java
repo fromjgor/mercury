@@ -5,6 +5,7 @@ import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.BinanceApiWebSocketClient;
 import com.binance.api.client.domain.account.Account;
 import com.binance.api.client.domain.account.AssetBalance;
+import com.binance.api.client.mercury.*;
 
 import java.util.Map;
 import java.util.TreeMap;
@@ -29,7 +30,7 @@ public class AccountBalanceCacheExample {
   private final String listenKey;
 
   public AccountBalanceCacheExample(String apiKey, String secret) {
-    this.clientFactory = BinanceApiClientFactory.newInstance(apiKey, secret);
+    this.clientFactory = BinanceApiClientFactory.newInstance(apiKey, secret );   
     this.listenKey = initializeAssetBalanceCacheAndStreamSession();
     startAccountBalanceEventStreaming(listenKey);
   }
@@ -76,6 +77,6 @@ public class AccountBalanceCacheExample {
   }
 
   public static void main(String[] args) {
-    new AccountBalanceCacheExample("YOUR_API_KEY", "YOUR_SECRET");
+    new AccountBalanceCacheExample(SecuritySettings.sKEY,SecuritySettings.sSECRET);    
   }
 }

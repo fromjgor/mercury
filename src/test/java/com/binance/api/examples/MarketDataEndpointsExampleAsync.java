@@ -1,5 +1,4 @@
 package com.binance.api.examples;
-
 import com.binance.api.client.BinanceApiAsyncRestClient;
 import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.domain.account.Account;
@@ -10,6 +9,7 @@ import com.binance.api.client.domain.market.OrderBook;
 import com.binance.api.client.domain.market.TickerPrice;
 import com.binance.api.client.domain.market.TickerStatistics;
 import com.binance.api.client.exception.BinanceApiException;
+import com.binance.api.client.mercury.*;
 
 import java.util.List;
 
@@ -19,16 +19,17 @@ import java.util.List;
 public class MarketDataEndpointsExampleAsync {
 
   public static void main(String[] args) {
+	String myPair = "IOTABTC";  
     BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance();
     BinanceApiAsyncRestClient client = factory.newAsyncRestClient();
 
     // Getting depth of a symbol (async)
-    client.getOrderBook("NEOETH", 10, (OrderBook response) -> {
+    client.getOrderBook(myPair, 10, (OrderBook response) -> {
       System.out.println(response.getBids());
     });
 
     // Getting latest price of a symbol (async)
-    client.get24HrPriceStatistics("NEOETH", (TickerStatistics response) -> {
+    client.get24HrPriceStatistics(myPair, (TickerStatistics response) -> {
       System.out.println(response);
     });
 
@@ -38,10 +39,10 @@ public class MarketDataEndpointsExampleAsync {
     });
 
     // Getting agg trades (async)
-    client.getAggTrades("NEOETH", (List<AggTrade> response) -> System.out.println(response));
+    client.getAggTrades(myPair, (List<AggTrade> response) -> System.out.println(response));
 
     // Weekly candlestick bars for a symbol
-    client.getCandlestickBars("NEOETH", CandlestickInterval.WEEKLY,
+    client.getCandlestickBars(myPair, CandlestickInterval.WEEKLY,
         (List<Candlestick> response) -> System.out.println(response));
 
     // Book tickers (async)
@@ -49,7 +50,7 @@ public class MarketDataEndpointsExampleAsync {
 
     // Exception handling
     try {
-      client.getOrderBook("UNKNOWN", 10, response -> System.out.println(response));
+      client.getOrderBook(myPair, 10, response -> System.out.println(response));
     } catch (BinanceApiException e) {
       System.out.println(e.getError().getCode()); // -1121
       System.out.println(e.getError().getMsg());  // Invalid symbol

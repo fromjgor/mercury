@@ -17,42 +17,46 @@ import java.util.List;
 /**
  * Examples on how to get market data information such as the latest price of a symbol, etc.
  */
-public class MarketDataEndpointsExample {
+
+public class MarketDataEndpointsLog {
 
   public static void main(String[] args) {
     BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance();
     BinanceApiRestClient client = factory.newRestClient();
 
+    /*******************************************************************************************************
     // Getting depth of a symbol
     OrderBook orderBook = client.getOrderBook("IOTABTC", 10);
     System.out.println(orderBook.getAsks());
-
+    *******************************************************************************************************/
+    
     // Getting latest price of a symbol
     TickerStatistics tickerStatistics = client.get24HrPriceStatistics("IOTABTC");
     System.out.println(tickerStatistics);
-
+   
     // Getting all latest prices
+
     List<TickerPrice> allPrices = client.getAllPrices();
     System.out.println(allPrices);
-
+/*******************************************************************************************************
     // Getting agg trades
     List<AggTrade> aggTrades = client.getAggTrades("IOTABTC");
     System.out.println(aggTrades);
 
-    // Weekly candlestick bars for a symbol
-    List<Candlestick> candlesticks = client.getCandlestickBars("IOTABTC", CandlestickInterval.WEEKLY);
+    // Last minute candlestick bars for a symbol
+    List<Candlestick> candlesticks = client.getCandlestickBars("IOTABTC", CandlestickInterval.ONE_MINUTE);
     System.out.println(candlesticks);
-
+********************************************************************************************************/
     // Getting all book tickers
     List<BookTicker> allBookTickers = client.getBookTickers();
     System.out.println(allBookTickers);
 
-    // Exception handling
-    try {
-      client.getOrderBook("IOTABTC", 10);
-    } catch (BinanceApiException e) {
-      System.out.println(e.getError().getCode()); // -1121
-      System.out.println(e.getError().getMsg());  // Invalid symbol
-    }
+//    // Exception handling
+//    try {
+//      client.getOrderBook("IOTABTC", 10);
+//    } catch (BinanceApiException e) {
+//      System.out.println(e.getError().getCode()); // -1121
+//      System.out.println(e.getError().getMsg());  // Invalid symbol
+//    }
   }
 }

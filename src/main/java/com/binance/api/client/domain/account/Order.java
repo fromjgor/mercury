@@ -79,7 +79,20 @@ public class Order {
    * Order timestamp.
    */
   private long time;
+  
+  /**
+   * Order indicator which is true when order is still working and false otherwise.
+   */
+  private boolean isWorking;
 
+  public boolean getIsWorking() {
+	    return isWorking;
+	  }
+
+  public void setIsWorking(boolean isWorking) {
+	    this.isWorking = isWorking;
+	  }
+  
   public String getSymbol() {
     return symbol;
   }
@@ -199,6 +212,7 @@ public class Order {
         .append("side", side)
         .append("stopPrice", stopPrice)
         .append("icebergQty", icebergQty)
+        .append("isWorking",isWorking)
         .append("time", time)
         .toString();
   }

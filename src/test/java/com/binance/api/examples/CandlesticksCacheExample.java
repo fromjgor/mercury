@@ -5,6 +5,7 @@ import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.BinanceApiWebSocketClient;
 import com.binance.api.client.domain.market.Candlestick;
 import com.binance.api.client.domain.market.CandlestickInterval;
+import com.binance.api.client.mercury.*;
 
 import java.util.List;
 import java.util.Map;
@@ -66,6 +67,9 @@ public class CandlesticksCacheExample {
       updateCandlestick.setTakerBuyQuoteAssetVolume(response.getTakerBuyQuoteAssetVolume());
       updateCandlestick.setTakerBuyBaseAssetVolume(response.getTakerBuyQuoteAssetVolume());
 
+      // Store this candlestick to the database    
+      new CandlestickDumpDb(symbol.toUpperCase()).insert(updateCandlestick);
+      
       // Store the updated candlestick in the cache
       candlesticksCache.put(openTime, updateCandlestick);
       System.out.println(updateCandlestick);
@@ -81,6 +85,15 @@ public class CandlesticksCacheExample {
   }
 
   public static void main(String[] args) {
+//    new CandlesticksCacheExample("ETHBTC", CandlestickInterval.ONE_MINUTE);
+    //new CandlesticksCacheExample("EOSBTC", CandlestickInterval.ONE_MINUTE);
+    new CandlesticksCacheExample("IOTAETH", CandlestickInterval.ONE_MINUTE);
+    new CandlesticksCacheExample("IOTABTC", CandlestickInterval.ONE_MINUTE);
     new CandlesticksCacheExample("ETHBTC", CandlestickInterval.ONE_MINUTE);
+    //new CandlesticksCacheExample("NEOBTC", CandlestickInterval.ONE_MINUTE);
+    //new CandlesticksCacheExample("BTGBTC", CandlestickInterval.ONE_MINUTE);
+    //new CandlesticksCacheExample("QTUMBTC", CandlestickInterval.ONE_MINUTE);
+    //new CandlesticksCacheExample("NEOBTC",CandlestickInterval.ONE_MINUTE);
+
   }
 }
