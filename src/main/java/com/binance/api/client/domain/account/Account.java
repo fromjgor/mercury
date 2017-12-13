@@ -44,6 +44,12 @@ public class Account {
    * Whether or not it is possible to deposit into this account.
    */
   private boolean canDeposit;
+  
+  /**
+   * Timestamp, apparently, of the last change
+   */
+ 
+  private long updateTime;
 
   private List<AssetBalance> balances;
 
@@ -141,6 +147,15 @@ public class Account {
         .append("canWithdraw", canWithdraw)
         .append("canDeposit", canDeposit)
         .append("balances", balances)
+        .append("updateTime",updateTime)
         .toString();
   }
+
+public long getUpdateTime() {
+	return updateTime;
+}
+
+public void setUpdateTime(long updateTime) {
+	this.updateTime = updateTime;
+}
 }
