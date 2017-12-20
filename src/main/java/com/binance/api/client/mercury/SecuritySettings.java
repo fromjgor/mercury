@@ -129,13 +129,14 @@ public static final String DBNAME = "c:/sqlite/data/binancetrade.db";
 	
 
 	  /**
-	   * Igor's Key .
+	   * Key .
 	   */
-   public static final String sKEY = "Bg7q9SkSgf28pu8LXzjJnifcxXFUnAwRMnBZIN4yyXOUIt68qHg9nYZtFScdp0GF";
+  public static final String sKEY = "";
    /**
-	   * Igor's Secret .
+	   * Secret .
 	   */
-   public static final String sSECRET = "RBllkgnIqgMHBYuIBiXbOV0FIEumf27OMvpwOhRAzdz9FzVkyNKC9PeketIoX0KW";
+  public static final String sSECRET = "";
+
    /*
     * API Key:
 	   Bg7q9SkSgf28pu8LXzjJnifcxXFUnAwRMnBZIN4yyXOUIt68qHg9nYZtFScdp0GF
