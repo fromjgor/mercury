@@ -206,20 +206,18 @@ public class CandlestickDumpDb // extends Thread
 */
 	public void insert(Candlestick event) {
 		try {
-			// create a database connection
-			if (connection != null) {
-				connection = DriverManager.getConnection("jdbc:sqlite:" + SecuritySettings.DBNAME);
-
-				Statement statement = connection.createStatement();
-				statement.setQueryTimeout(30); // set timeout to 30 sec.
-			}
-
-			String sqlSymbol = "'" + symbol + "'";
-			statement.executeUpdate("insert into journal values(" + sqlSymbol + "," + event.getOpenTime() + ","
-					+ event.getOpen() + "," + event.getLow() + "," + event.getHigh() + "," + event.getClose() + ","
-					+ event.getCloseTime() + "," + event.getVolume() + "," + event.getNumberOfTrades() + ","
-					+ event.getQuoteAssetVolume() + "," + event.getTakerBuyQuoteAssetVolume() + ","
-					+ event.getTakerBuyQuoteAssetVolume() + " )");
+			Writer writer = Writer.getNext();
+			String sqlStmnt = "insert into journal values('" + symbol + "'," + event.getOpenTime() + ","
+			+ event.getOpen() + "," + event.getLow() + "," + event.getHigh() + "," + event.getClose() + ","
+			+ event.getCloseTime() + "," + event.getVolume() + "," + event.getNumberOfTrades() + ","
+			+ event.getQuoteAssetVolume() + "," + event.getTakerBuyQuoteAssetVolume() + ","
+			+ event.getTakerBuyQuoteAssetVolume() + " )";
+			
+			writer.lock();
+			writer.setMessage("journal start");
+			writer.executeUpdate(sqlStmnt);			
+			writer.setMessage("journal end");
+			writer.unlock();		
 
 			/*
 			 * ResultSet rs = statement.executeQuery("select * from candlestick");
@@ -232,13 +230,14 @@ public class CandlestickDumpDb // extends Thread
 			// it probably means no database file is found
 			System.err.println(e.getMessage());
 		} finally {
-			try {
+
+			/*try {
 				if (connection != null)
 					connection.close();
 			} catch (SQLException e) {
 				// connection close failed.
 				System.err.println(e);
-			}
+			}*/
 		}
 	}
 }

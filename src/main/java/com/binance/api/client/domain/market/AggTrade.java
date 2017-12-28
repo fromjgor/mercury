@@ -26,7 +26,7 @@ public class AggTrade {
   @JsonProperty("l")
   private long lastBreakdownTradeId;
 
-  @JsonProperty("T")
+  @JsonProperty("t")
   private long tradeTime;
 
   @JsonProperty("m")

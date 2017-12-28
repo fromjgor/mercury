@@ -86,7 +86,7 @@ public class DepthCacheExample {
 				lastUpdateId = response.getUpdateId();
 				updateOrderBook(getAsks(), response.getAsks());
 				updateOrderBook(getBids(), response.getBids());
-				printDepthCache();
+//				printDepthCache();
 				storeDepthCache(response.getSymbol(), response.getUpdateId(), response.getEventTime());// log order book
 																										// to the
 																										// database
@@ -160,15 +160,25 @@ public class DepthCacheExample {
 
 	private void storeDepthCache(String symbol, long updateId, long eventTime) {
 
+		BigDecimal priceLimit = new BigDecimal( 0.00 );
+		BigDecimal priceLossLimit = new BigDecimal( 0.00 );
 		BigDecimal bestAskPrice = getBestAsk().getKey();  
 		BigDecimal bestBidPrice = getBestBid().getKey();
 		
-		BigDecimal priceLimit = new BigDecimal( 0.0003999 );
-		BigDecimal priceLossLimit = new BigDecimal( 0.0002999 );
-		
-		if( symbol.compareTo("IOTABTC") == 0) {
-			if ( bestAskPrice.compareTo(priceLimit) >= 0 ||   
-					 bestBidPrice.compareTo(priceLossLimit) >= 0 ) {
+		if( symbol.compareTo("QTUMBTC") == 0) {
+			priceLimit = new BigDecimal( 0.003131111 );
+			priceLossLimit = new BigDecimal( 0.003);
+	
+			
+		} else if( symbol.compareTo("NEOBTC") == 0) {
+			priceLimit = new BigDecimal( 0.0042996 );
+			priceLossLimit = new BigDecimal( 0.00423 );
+			
+		}
+		if( priceLimit.compareTo( priceLossLimit ) > 0 ) 	
+			{
+			if ( bestAskPrice.compareTo(priceLimit) > 0 ||   
+					 bestBidPrice.compareTo(priceLossLimit) < 0 ) {
 				System.out.println(" bestAskPrice | priceLimit | priceLossLimit ");
 				System.out.println(bestAskPrice);
 				System.out.println(priceLimit);
@@ -232,10 +242,12 @@ public class DepthCacheExample {
 // asynchronous call
 		logger.run();
 
-// asynchronous call
-		//Thread thread = new Thread(logger);
-		//thread.start();
+		// asynchronous call
 		
+		/*
+		Thread thread = new Thread(logger);
+		thread.start();
+		*/
 	}
 
 	/**
@@ -246,8 +258,8 @@ public class DepthCacheExample {
 	}
 
 	public static void main(String[] args) {
-		new DepthCacheExample("ETHBTC");
-		new DepthCacheExample("IOTAETH");
+		/*new DepthCacheExample("ETHBTC");
+		new DepthCacheExample("IOTAETH");*/
 		new DepthCacheExample("IOTABTC");
 	}
 }

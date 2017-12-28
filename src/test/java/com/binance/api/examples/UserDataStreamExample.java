@@ -29,6 +29,14 @@ public class UserDataStreamExample {
     // Then, we open a new web socket client, and provide a callback that is called on every update
     BinanceApiWebSocketClient webSocketClient = factory.newWebSocketClient();
 
+    /*String symbol = "IOTABTC";
+    webSocketClient.onAggTradeEvent(symbol, response -> {
+    	if (response.getEventType() == null ) {
+    		
+    	}
+    });*/
+    
+    
     // Listen for changes in the account
     webSocketClient.onUserDataUpdateEvent(listenKey, response -> {
       if (response.getEventType() == UserDataUpdateEventType.ACCOUNT_UPDATE) {
