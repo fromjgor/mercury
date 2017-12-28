@@ -67,7 +67,7 @@ public class AggTradesCacheExample {
 	 * arrives.
 	 */	
 	//private Map<Long, List<AggTrade>> aggTradeTicksCashe;
-	private MercuryRealTimeChart realTimeChart = new MercuryRealTimeChart();   
+	private MercuryRealTimeChart realTimeChart = null;   
 	
 	/**
 	 * Tick duration is 1000 millisecond 
@@ -185,14 +185,18 @@ public class AggTradesCacheExample {
 				tickIndex++;			
 			}
 			listAggTrade.add(aggTrade);*/
+			
+			Double price = new Double(aggTrade.getPrice());
+			Double quantity = new Double(aggTrade.getQuantity());
+			Double amount = price * quantity;
+			
 			xData.add(++counter);
-			yData.add(new Double(aggTrade.getPrice()));
+			yData.add(amount);
+			errorBars.add(0.0);
 			aggTradesCache.put(aggTrade.getAggregatedTradeId(), aggTrade);
 		}
 		
-		realTimeChart.setxData(xData);
-		realTimeChart.setyData(yData);
-		realTimeChart.initializeMercuryRealTimeChart();
+		realTimeChart = new MercuryRealTimeChart(xData,yData, errorBars);
 	}
 
 	/**

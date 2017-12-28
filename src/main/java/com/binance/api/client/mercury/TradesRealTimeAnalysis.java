@@ -67,7 +67,7 @@ public class TradesRealTimeAnalysis {
 	 * arrives.
 	 */	
 	//private Map<Long, List<AggTrade>> aggTradeTicksCashe;
-	private MercuryRealTimeChart realTimeChart = new MercuryRealTimeChart();   
+	private MercuryRealTimeChart realTimeChart = null;   
 	
 	/**
 	 * Tick duration is 1000 millisecond 
@@ -189,10 +189,8 @@ public class TradesRealTimeAnalysis {
 			yData.add(new Double(aggTrade.getPrice()));
 			aggTradesCache.put(aggTrade.getAggregatedTradeId(), aggTrade);
 		}
-		
-		realTimeChart.setxData(xData);
-		realTimeChart.setyData(yData);
-		realTimeChart.initializeMercuryRealTimeChart();
+
+		realTimeChart = new MercuryRealTimeChart(xData,yData, errorBars);
 	}
 
 	/**

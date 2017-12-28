@@ -51,45 +51,48 @@ public class MercuryRealTimeChart implements ExampleChart<XYChart> {
 
   public static final String SERIES_NAME = "trades";
 
-  public void initializeMercuryRealTimeChart() {
+  public MercuryRealTimeChart(List<Integer> xData,List<Double> yData, List<Double> errorBars) {
+	  this.xData = xData;
+	  this.yData = yData;
+	  this.errorBars = errorBars;
+	  final MercuryRealTimeChart realtimeChart = this; 
+	  final XChartPanel<XYChart> chartPanel = this.buildPanel();
+	    // Schedule a job for the event-dispatching thread:
+	    // creating and showing this application's GUI.
+	    javax.swing.SwingUtilities.invokeLater(new Runnable() {
 
-    // Setup the panel
-    final MercuryRealTimeChart realtimeChart = new MercuryRealTimeChart();
-    final XChartPanel<XYChart> chartPanel = realtimeChart.buildPanel();
+	      @Override
+	      public void run() {
 
-    // Schedule a job for the event-dispatching thread:
-    // creating and showing this application's GUI.
-    javax.swing.SwingUtilities.invokeLater(new Runnable() {
+	        // Create and set up the window.
+	        JFrame frame = new JFrame("XChart");
+	        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+	        frame.add(chartPanel);
 
-      @Override
-      public void run() {
+	        // Display the window.
+	        frame.pack();
+	        frame.setVisible(true);
+	      }
+	    });
 
-        // Create and set up the window.
-        JFrame frame = new JFrame("XChart");
-        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        frame.add(chartPanel);
+	    // Simulate a data feed
+	    /*TimerTask chartUpdaterTask = new TimerTask() {
 
-        // Display the window.
-        frame.pack();
-        frame.setVisible(true);
-      }
-    });
+	      @Override
+	      public void run() {
 
-    // Simulate a data feed
-    TimerTask chartUpdaterTask = new TimerTask() {
+	        realtimeChart.updateData(xData,yData,errorBars);
+	        chartPanel.revalidate();
+	        chartPanel.repaint();
+	      }
+	    };
 
-      @Override
-      public void run() {
-
-        realtimeChart.updateData(xData,yData,errorBars);
-        chartPanel.revalidate();
-        chartPanel.repaint();
-      }
-    };
-
-    Timer timer = new Timer();
-    timer.scheduleAtFixedRate(chartUpdaterTask, 0, 500);
+	    Timer timer = new Timer();
+	    timer.scheduleAtFixedRate(chartUpdaterTask, 0, 500);
+	    */
+	  
   }
+  
 
   public XChartPanel<XYChart> buildPanel() {
 
@@ -123,10 +126,10 @@ public class MercuryRealTimeChart implements ExampleChart<XYChart> {
     return xyChart;
   }
 
-  /*private Double getRandomWalk(double lastPoint) {
+  private Double getRandomWalk(double lastPoint) {
 
     return lastPoint + (Math.random() * 100 - 50);
-  }*/
+  }
 
   public void updateData(List<Integer> xData, List<Double> yData, List<Double> errorBars) {
 /*
