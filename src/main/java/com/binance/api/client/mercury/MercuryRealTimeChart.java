@@ -76,7 +76,7 @@ public class MercuryRealTimeChart implements ExampleChart<XYChart> {
 	    });
 
 	    // Simulate a data feed
-	    /*TimerTask chartUpdaterTask = new TimerTask() {
+	    TimerTask chartUpdaterTask = new TimerTask() {
 
 	      @Override
 	      public void run() {
@@ -89,8 +89,6 @@ public class MercuryRealTimeChart implements ExampleChart<XYChart> {
 
 	    Timer timer = new Timer();
 	    timer.scheduleAtFixedRate(chartUpdaterTask, 0, 500);
-	    */
-	  
   }
   
 
@@ -126,24 +124,12 @@ public class MercuryRealTimeChart implements ExampleChart<XYChart> {
     return xyChart;
   }
 
-  private Double getRandomWalk(double lastPoint) {
-
-    return lastPoint + (Math.random() * 100 - 50);
-  }
-
   public void updateData(List<Integer> xData, List<Double> yData, List<Double> errorBars) {
-/*
-    // Get some new data
-    double lastPoint = yData.get(yData.size() - 1);
-    yData.add(getRandomWalk(lastPoint));
-    yData.remove(0);
-
-    // update error bars
-    errorBars.add(20 * Math.random());
-    errorBars.remove(0);
-*/
     xyChart.updateXYSeries(SERIES_NAME, xData, yData, errorBars);
-  }
+    this.xData 	   = xData;
+    this.yData 	   = yData;
+    this.errorBars = errorBars;
+    }
 
 public XYChart getXyChart() {
 	return xyChart;

@@ -303,6 +303,25 @@ public class AggTradesCacheExample {
 			// Build time series
 			TimeSeries series = new BaseTimeSeries(symbol, ticks);
 			
+
+			List<Integer> xData = new CopyOnWriteArrayList<Integer>();
+			List<Double> yData = new CopyOnWriteArrayList<Double>();
+			List<Double> errorBars = new CopyOnWriteArrayList<Double>();
+	        
+			for( int x: realTimeChart.getxData() ) {
+				xData.add(x);
+			}
+			for( double y: realTimeChart.getyData() ) {
+				yData.add(y);
+			}
+			for( double e: realTimeChart.getErrorBars() ) {
+				errorBars.add(e);
+			}
+			xData.add(xData.size()+1);
+			yData.add(new Double(response.getPrice()));
+			errorBars.add(0.0);
+			
+			realTimeChart.updateData(xData, yData, errorBars);
 			
 			/*
 			 *  Log AggTrade into database
