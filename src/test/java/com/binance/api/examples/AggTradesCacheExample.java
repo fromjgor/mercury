@@ -60,6 +60,8 @@ public class AggTradesCacheExample {
 	 * data, which is automatically updated whenever a new agg data stream event
 	 * arrives.
 	 */
+	private long tradeSessionStartTime;
+	
 	private Map<Long, AggTrade> aggTradesCache;
 	/**
 	 * Key is the minimal time stamp of the tick, and the value contains the aggregated trades
@@ -166,6 +168,12 @@ public class AggTradesCacheExample {
 		*	ZonedDateTime tickEndTime = ZonedDateTime.now(ZoneId.systemDefault());
 		*/
 
+	    // Test connectivity
+	    client.ping();
+
+	    // Check server time
+	    tradeSessionStartTime = client.getServerTime();
+
 		List<Integer> xData = new CopyOnWriteArrayList<Integer>();
 		List<Double> yData = new CopyOnWriteArrayList<Double>();
 		List<Double> errorBars = new CopyOnWriteArrayList<Double>();
@@ -196,7 +204,9 @@ public class AggTradesCacheExample {
 			aggTradesCache.put(aggTrade.getAggregatedTradeId(), aggTrade);
 		}
 		
-		realTimeChart = new MercuryRealTimeChart(xData,yData, errorBars);
+		/*realTimeChart = new MercuryRealTimeChart(xData,yData, errorBars, response -> { 
+			
+		} );*/
 	}
 
 	/**
@@ -258,7 +268,8 @@ public class AggTradesCacheExample {
 			
 /*
  * Build ticks and Series 
- * */			
+ * */
+			
 			Long trendAnalysisTimeFrame = 5L;  // perform a trend analysis using last 5 seconds time frame
 			
 			ZonedDateTime tickEndTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(response.getEventTime()), //lastTradeEventTime
@@ -276,6 +287,7 @@ public class AggTradesCacheExample {
 			}
 			*/
 			
+/*			
 			// Building the empty ticks 
 			List<Tick> ticks = buildEmptyTicks(tickStartTime, tickEndTime);
 			
@@ -302,26 +314,27 @@ public class AggTradesCacheExample {
 			
 			// Build time series
 			TimeSeries series = new BaseTimeSeries(symbol, ticks);
-			
-
-			List<Integer> xData = new CopyOnWriteArrayList<Integer>();
-			List<Double> yData = new CopyOnWriteArrayList<Double>();
-			List<Double> errorBars = new CopyOnWriteArrayList<Double>();
-	        
-			for( int x: realTimeChart.getxData() ) {
-				xData.add(x);
+*/			
+			if( realTimeChart != null ) {
+				List<Integer> xData = new CopyOnWriteArrayList<Integer>();
+				List<Double> yData = new CopyOnWriteArrayList<Double>();
+				List<Double> errorBars = new CopyOnWriteArrayList<Double>();
+		        
+				for( int x: realTimeChart.getxData() ) {
+					xData.add(x);
+				}
+				for( double y: realTimeChart.getyData() ) {
+					yData.add(y);
+				}
+				for( double e: realTimeChart.getErrorBars() ) {
+					errorBars.add(e);
+				}
+				xData.add(xData.size()+1);
+				yData.add(new Double(response.getPrice()));
+				errorBars.add(0.0);
+				
+				realTimeChart.updateData(xData, yData, errorBars);				
 			}
-			for( double y: realTimeChart.getyData() ) {
-				yData.add(y);
-			}
-			for( double e: realTimeChart.getErrorBars() ) {
-				errorBars.add(e);
-			}
-			xData.add(xData.size()+1);
-			yData.add(new Double(response.getPrice()));
-			errorBars.add(0.0);
-			
-			realTimeChart.updateData(xData, yData, errorBars);
 			
 			/*
 			 *  Log AggTrade into database
@@ -355,13 +368,13 @@ public class AggTradesCacheExample {
 	}
 
 	public static void main(String[] args) {
+		String[] myFavoritesBTC = new String[] {"QTUM","NEO", "IOTA", "FUEL", "ETH"};
+		for (String  symbol : myFavoritesBTC) {
+			String pair = symbol + "BTC";
+			new AggTradesCacheExample(pair);
+			new DepthCacheExample(pair);
+			//new CandlesticksCacheExample(pair, CandlestickInterval. ONE_MINUTE);
+		}
 		
-		new AggTradesCacheExample("IOTABTC");
-		
-		/*
-		 * new CandlesticksCacheExample("IOTAETH", CandlestickInterval. ONE_MINUTE); new
-		 * CandlesticksCacheExample("IOTABTC", CandlestickInterval.ONE_MINUTE); new
-		 * CandlesticksCacheExample("ETHBTC", CandlestickInterval.ONE_MINUTE);
-		 */
 	}
 }

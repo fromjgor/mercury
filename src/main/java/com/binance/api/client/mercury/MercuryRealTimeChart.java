@@ -31,6 +31,8 @@ import org.knowm.xchart.XYChart;
 import org.knowm.xchart.XYChartBuilder;
 import org.knowm.xchart.demo.charts.ExampleChart;
 
+import com.binance.api.client.BinanceApiCallback;
+
 /**
  * Real-time XY Chart with Error Bars
  * <p>
@@ -51,7 +53,7 @@ public class MercuryRealTimeChart implements ExampleChart<XYChart> {
 
   public static final String SERIES_NAME = "trades";
 
-  public MercuryRealTimeChart(List<Integer> xData,List<Double> yData, List<Double> errorBars) {
+  public MercuryRealTimeChart(List<Integer> xData,List<Double> yData, List<Double> errorBars,MercuryTradeCallback<Void> callback) {
 	  this.xData = xData;
 	  this.yData = yData;
 	  this.errorBars = errorBars;
