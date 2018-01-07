@@ -177,7 +177,15 @@ public class AggTradesCacheExample {
 		List<Integer> xData = new CopyOnWriteArrayList<Integer>();
 		List<Double> yData = new CopyOnWriteArrayList<Double>();
 		List<Double> errorBars = new CopyOnWriteArrayList<Double>();
-        int counter = 0;					
+        int counter = 0;
+        long startTimestamp = tradeSessionStartTime;
+        long endTimestamp = tradeSessionStartTime;
+        for (AggTrade aggTrade : aggTrades) {
+        	Long currentTimestamp = aggTrade.getTradeTime();
+        	if ( currentTimestamp < startTimestamp ) startTimestamp = currentTimestamp;
+        	if ( currentTimestamp > endTimestamp ) 	 endTimestamp = currentTimestamp;
+        }
+        
 		for (AggTrade aggTrade : aggTrades) {
 			
 			/*ZonedDateTime tradeTimestamp = ZonedDateTime.ofInstant(Instant.ofEpochMilli(aggTrade.getTradeTime()),
@@ -194,11 +202,11 @@ public class AggTradesCacheExample {
 			}
 			listAggTrade.add(aggTrade);*/
 			
+			Long currentTimestamp = aggTrade.getTradeTime();
 			Double price = new Double(aggTrade.getPrice());
 			Double quantity = new Double(aggTrade.getQuantity());
-			Double amount = price * quantity;
-			
-			xData.add(++counter);
+			Double amount = price * quantity;			
+			xData.add( (int) (long) (50 * (currentTimestamp - startTimestamp)/(endTimestamp - startTimestamp)));
 			yData.add(amount);
 			errorBars.add(0.0);
 			aggTradesCache.put(aggTrade.getAggregatedTradeId(), aggTrade);
@@ -329,9 +337,13 @@ public class AggTradesCacheExample {
 				for( double e: realTimeChart.getErrorBars() ) {
 					errorBars.add(e);
 				}
-				xData.add(xData.size()+1);
+				//xData.add(xData.size()+1);
+				xData.add(50);
+				xData.remove(0);
 				yData.add(new Double(response.getPrice()));
-				errorBars.add(0.0);
+				yData.remove(0);
+				//errorBars.add(0.0);
+				//errorBars.remove(0);
 				
 				realTimeChart.updateData(xData, yData, errorBars);				
 			}
@@ -368,7 +380,7 @@ public class AggTradesCacheExample {
 	}
 
 	public static void main(String[] args) {
-		String[] myFavoritesBTC = new String[] {"QTUM","NEO", "IOTA", "FUEL", "ETH"};
+		String[] myFavoritesBTC = new String[] {"QTUM","NEO", "IOTA", "FUEL", "ETH", "BNB"};
 		for (String  symbol : myFavoritesBTC) {
 			String pair = symbol + "BTC";
 			new AggTradesCacheExample(pair);

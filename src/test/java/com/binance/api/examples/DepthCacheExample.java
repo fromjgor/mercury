@@ -166,17 +166,17 @@ public class DepthCacheExample {
 		BigDecimal bestBidPrice = getBestBid().getKey();
 		
 		if( symbol.compareTo("QTUMBTC") == 0) {
-			priceLimit = new BigDecimal( 0.0036 );
-			priceLossLimit = new BigDecimal( 0.0035);
+			priceLimit = new BigDecimal( 0.0040 );
+			priceLossLimit = new BigDecimal( 0.003);
 	
 			
-		} else if( symbol.compareTo("NEOBTC") == 0) {
+		}/* else if( symbol.compareTo("NEOBTC") == 0) {
 			priceLimit = new BigDecimal( 0.0049 );
 			priceLossLimit = new BigDecimal( 0.0048 );
 			
-		} else if( symbol.compareTo("FUELBTC") == 0) {
-		priceLimit = new BigDecimal( 0.00001 );
-		priceLossLimit = new BigDecimal( 0.0000936 );
+		}*/ else if( symbol.compareTo("FUELBTC") == 0) {
+		priceLimit = new BigDecimal( 0.00029311 );
+		priceLossLimit = new BigDecimal( 0.000028936 );
 		
 	}
 

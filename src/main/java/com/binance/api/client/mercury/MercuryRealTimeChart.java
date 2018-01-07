@@ -53,10 +53,11 @@ public class MercuryRealTimeChart implements ExampleChart<XYChart> {
 
   public static final String SERIES_NAME = "trades";
 
-  public MercuryRealTimeChart(List<Integer> xData,List<Double> yData, List<Double> errorBars,MercuryTradeCallback<Void> callback) {
+  public MercuryRealTimeChart() {
+	  /*List<Integer> xData,List<Double> yData, List<Double> errorBars,MercuryTradeCallback<Void> callback) {
 	  this.xData = xData;
 	  this.yData = yData;
-	  this.errorBars = errorBars;
+	  this.errorBars = errorBars;*/
 	  final MercuryRealTimeChart realtimeChart = this; 
 	  final XChartPanel<XYChart> chartPanel = this.buildPanel();
 	    // Schedule a job for the event-dispatching thread:
@@ -82,15 +83,15 @@ public class MercuryRealTimeChart implements ExampleChart<XYChart> {
 
 	      @Override
 	      public void run() {
-
-	        realtimeChart.updateData(xData,yData,errorBars);
+	    	//	xData,yData,errorBars might have been changed from outside
+	        //realtimeChart.updateData(xData,yData,errorBars);
 	        chartPanel.revalidate();
 	        chartPanel.repaint();
 	      }
 	    };
 
 	    Timer timer = new Timer();
-	    timer.scheduleAtFixedRate(chartUpdaterTask, 0, 500);
+	    timer.scheduleAtFixedRate(chartUpdaterTask, 0, 50);
   }
   
 
