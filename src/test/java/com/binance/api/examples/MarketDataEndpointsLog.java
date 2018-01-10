@@ -19,6 +19,7 @@ import java.util.List;
  */
 
 public class MarketDataEndpointsLog {
+	
 
   public static void main(String[] args) {
     BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance();

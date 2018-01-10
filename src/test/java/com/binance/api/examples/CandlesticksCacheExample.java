@@ -85,6 +85,15 @@ public class CandlesticksCacheExample {
   }
 
   public static void main(String[] args) {
+	  
+		String[] myFavoritesBTC = new String[] {"QTUM","NEO", "IOTA", "FUEL", "ETH", "BNB"};
+		for (String  symbol : myFavoritesBTC) {
+			String pair = symbol + "BTC";
+			new AggTradesCacheExample(pair);
+			new DepthCacheExample(pair);
+			//new CandlesticksCacheExample(pair, CandlestickInterval. ONE_MINUTE);
+		}
+
 //    new CandlesticksCacheExample("ETHBTC", CandlestickInterval.ONE_MINUTE);
     //new CandlesticksCacheExample("EOSBTC", CandlestickInterval.ONE_MINUTE);
     new CandlesticksCacheExample("IOTAETH", CandlestickInterval.ONE_MINUTE);

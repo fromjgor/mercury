@@ -4,6 +4,8 @@ import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.BinanceApiWebSocketClient;
 import com.binance.api.client.domain.market.AggTrade;
+import com.binance.api.client.domain.market.Candlestick;
+import com.binance.api.client.domain.market.CandlestickInterval;
 import com.binance.api.client.mercury.*;
 
 import java.math.BigDecimal;
@@ -23,16 +25,11 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import javax.swing.JFrame;
-import javax.swing.WindowConstants;
-
-import org.knowm.xchart.XChartPanel;
-import org.knowm.xchart.XYChart;
-
 import org.ta4j.core.BaseTick;
 import org.ta4j.core.BaseTimeSeries;
 import org.ta4j.core.Tick;
 import org.ta4j.core.TimeSeries;
+
 import org.ta4j.core.BaseTick;
 import org.ta4j.core.BaseTimeSeries;
 import org.ta4j.core.Tick;
@@ -42,12 +39,13 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+/*
 import javax.swing.JFrame;
 import javax.swing.WindowConstants;
-
 import org.knowm.xchart.XChartPanel;
 import org.knowm.xchart.XYChart;
 import org.knowm.xchart.XYChartBuilder;
+*/
 
 /**
  * Illustrates how to use the aggTrades event stream to create a local cache of
@@ -67,9 +65,10 @@ public class AggTradesCacheExample {
 	 * Key is the minimal time stamp of the tick, and the value contains the aggregated trades
 	 * data, that is automatically collected whenever a new agg data stream event
 	 * arrives.
-	 */	
+	 */
+	
 	//private Map<Long, List<AggTrade>> aggTradeTicksCashe;
-	private MercuryRealTimeChart realTimeChart = null;   
+	//private MercuryRealTimeChart realTimeChart = null;   
 	
 	/**
 	 * Tick duration is 1000 millisecond 
@@ -323,6 +322,8 @@ public class AggTradesCacheExample {
 			// Build time series
 			TimeSeries series = new BaseTimeSeries(symbol, ticks);
 */			
+			
+/*
 			if( realTimeChart != null ) {
 				List<Integer> xData = new CopyOnWriteArrayList<Integer>();
 				List<Double> yData = new CopyOnWriteArrayList<Double>();
@@ -347,6 +348,7 @@ public class AggTradesCacheExample {
 				
 				realTimeChart.updateData(xData, yData, errorBars);				
 			}
+			*/
 			
 			/*
 			 *  Log AggTrade into database
@@ -362,7 +364,7 @@ public class AggTradesCacheExample {
 		logger.setAggtrade(updateAggTrade);
 
 		// synchronous call
-		// logger.run();
+		//logger.run();
 
 		// asynchronous call
 		Thread thread = new Thread(logger);
@@ -380,12 +382,12 @@ public class AggTradesCacheExample {
 	}
 
 	public static void main(String[] args) {
-		String[] myFavoritesBTC = new String[] {"QTUM","NEO", "IOTA", "FUEL", "ETH", "BNB"};
+		String[] myFavoritesBTC = new String[] {"QTUM","NEO", "IOTA", "FUEL", "ETH", "ETC", "XRP", "AION", "ICX","BNB"};
 		for (String  symbol : myFavoritesBTC) {
 			String pair = symbol + "BTC";
 			new AggTradesCacheExample(pair);
-			new DepthCacheExample(pair);
-			//new CandlesticksCacheExample(pair, CandlestickInterval. ONE_MINUTE);
+			//new DepthCacheExample(pair);
+		    new CandlesticksCacheExample(pair, CandlestickInterval.ONE_MINUTE);
 		}
 		
 	}
