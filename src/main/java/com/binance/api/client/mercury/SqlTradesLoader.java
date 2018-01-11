@@ -1,6 +1,7 @@
 package com.binance.api.client.mercury;
 
 import java.sql.Connection;
+import java.util.Optional;
 import java.sql.ResultSet;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -19,6 +20,7 @@ import java.util.logging.Logger;
 
 import org.ta4j.core.BaseTick;
 import org.ta4j.core.BaseTimeSeries;
+import org.ta4j.core.Decimal;
 import org.ta4j.core.Tick;
 import org.ta4j.core.TimeSeries;
 
@@ -89,7 +91,7 @@ public class SqlTradesLoader {
 	 *            the tick duration (in seconds)
 	 * @return the list of empty ticks
 	 */
-	private static List<Tick> buildEmptyTicks(ZonedDateTime beginTime, ZonedDateTime endTime, int duration) {
+	public static List<Tick> buildEmptyTicks(ZonedDateTime beginTime, ZonedDateTime endTime, int duration) {
 
 		List<Tick> emptyTicks = new ArrayList<>();
 
@@ -109,15 +111,20 @@ public class SqlTradesLoader {
 	 * @param ticks
 	 *            a list of ticks
 	 */
-	private static void removeEmptyTicks(List<Tick> ticks) {
+	public static void removeEmptyTicks(List<Tick> ticks) {
 		for (int i = ticks.size() - 1; i >= 0; i--) {
-			if (ticks.get(i).getTrades() == 0) {
+			if (ticks.get(i).getTrades() == 0 /*|| 
+				ticks.get(i).getClosePrice() == Decimal.valueOf(0) || 
+				ticks.get(i).getVolume() == Decimal.valueOf(0)*/
+				) {
 				ticks.remove(i);
 			}
 		}
 	}
 
-	public TimeSeries loadSeries() {
+	public TimeSeries loadSeries(Optional<Integer> maxticksOpt) {
+		Integer ticksizeinseconds = 60;
+		Integer maxticks = maxticksOpt.isPresent() ? maxticksOpt.get() : 0;
 
 		List<Tick> ticks = null;
 		ResultSet rs = null;
@@ -136,10 +143,14 @@ public class SqlTradesLoader {
 						ZoneId.systemDefault());
 			}
 			rs.close();
+			
+			if ( maxticks > 0 ) {
+				beginTime = endTime.minusSeconds(ticksizeinseconds*maxticks); 
+			}
 
-			// Building the empty ticks (every 300 seconds, yeah welcome in cryptoworld)
-			ticks = buildEmptyTicks(beginTime, endTime, 300);
-			//ticks = buildEmptyTicks(beginTime, endTime, 60);
+			// Building the empty ticks every one minute (60 seconds), yeah welcome in the crypto-world)
+			ticks = buildEmptyTicks(beginTime, endTime, ticksizeinseconds);
+			//ticks = buildEmptyTicks(beginTime, endTime, 300);
 
 			// Filling the ticks with trades
 			rs = statement.executeQuery(
