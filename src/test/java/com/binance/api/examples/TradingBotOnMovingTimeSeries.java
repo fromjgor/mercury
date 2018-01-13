@@ -171,8 +171,8 @@ public class TradingBotOnMovingTimeSeries {
         //Strategy buySellSignals  =  new CCICorrectionStrategy().buildStrategy(series);
         
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        SMAIndicator sma = new SMAIndicator(closePrice, 7);
-        //SMAIndicator sma = new SMAIndicator(closePrice, 12);
+        SMAIndicator sma = new SMAIndicator(closePrice, 12);
+        //SMAIndicator sma = new SMAIndicator(closePrice, 7);
 
         // Signals
         // Buy when SMA goes over close price
@@ -198,8 +198,10 @@ public class TradingBotOnMovingTimeSeries {
         return randomDecimal;
     }
 
+    private static Decimal walletAmount   = Decimal.valueOf(1);//BTC
+    private static Decimal walletQuantity = Decimal.valueOf(0);
+    
     private static void run(String symbol,int maxTickCount) {
-    	
     	TimeSeries series = initializeMovingTimeSeries(symbol);
     	series.setMaximumTickCount(maxTickCount);
     	
@@ -225,9 +227,11 @@ public class TradingBotOnMovingTimeSeries {
     		}
       		candlesticksCache.put(candlestickBar.getOpenTime(), candlestickBar);
     	}
+        ZonedDateTime startOpenTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(startOpenTimestamp), ZoneId.systemDefault());
         ZonedDateTime endOpenTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(endOpenTimestamp), ZoneId.systemDefault());
         
-        List<Tick> newTicks = SqlTradesLoader.buildEmptyTicks(endTimeLastTick, endOpenTime, 1); //60 seconds in a minute
+        //List<Tick> newTicks = SqlTradesLoader.buildEmptyTicks(endTimeLastTick, endOpenTime, 1); 
+        List<Tick> newTicks = SqlTradesLoader.buildEmptyTicks(startOpenTime,endOpenTime, 1); 
     	for (Candlestick candlestickBar : candlestickBars) {
     		ZonedDateTime tradeTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(candlestickBar.getOpenTime()), ZoneId.systemDefault());
     		
@@ -246,6 +250,9 @@ public class TradingBotOnMovingTimeSeries {
 					Decimal price = Decimal.valueOf(candlestickBar.getClose());
 					newTicks.get(i).addTrade(amount, price);
 					LAST_TICK_CLOSE_PRICE = Decimal.valueOf(candlestickBar.getClose());
+					// Store this candlestick to the database    
+				    new CandlestickDumpDb(symbol.toUpperCase()).insert(candlestickBar);
+				      
 					/*series.addTick( new BaseTick(
 					tradeTime,
 					Decimal.valueOf(candlestickBar.getOpen()),
@@ -260,7 +267,8 @@ public class TradingBotOnMovingTimeSeries {
     	}
         // Removing still empty ticks
         if ( newTicks.size() > 0 ) SqlTradesLoader.removeEmptyTicks(newTicks);
-
+        series.setMaximumTickCount(maxTickCount);
+        
         // Building the trading strategy
         Strategy strategy = buildStrategy(series);
         
@@ -292,7 +300,8 @@ public class TradingBotOnMovingTimeSeries {
 	      updateCandlestick.setQuoteAssetVolume(response.getQuoteAssetVolume());
 	      updateCandlestick.setTakerBuyQuoteAssetVolume(response.getTakerBuyQuoteAssetVolume());
 	      updateCandlestick.setTakerBuyBaseAssetVolume(response.getTakerBuyQuoteAssetVolume());
-	      
+		  new CandlestickDumpDb(symbol.toUpperCase()).insert(updateCandlestick);
+		  
 	      long openTimestamp = response.getOpenTime();
 	      ZonedDateTime openTimeCandlestick = ZonedDateTime.ofInstant(Instant.ofEpochMilli(openTimestamp), ZoneId.systemDefault());
 	      
@@ -308,7 +317,7 @@ public class TradingBotOnMovingTimeSeries {
 							);
 			 series.addTick( newTick );
              System.out.println("------------------------------------------------------\n"
-                    + "Tick "+ series.getTickCount() +" added, close price = " + newTick.getClosePrice().toDouble());
+                    + "Tick "+ series.getTickCount() +" added at " +  lastKnownTick.getEndTime() + ", close price = " + newTick.getClosePrice().toDouble());
 			 
 			 LAST_TICK_CLOSE_PRICE = Decimal.valueOf(updateCandlestick.getClose());
 	      } else if ( openTimeCandlestick.isBefore(lastKnownTick.getEndTime()) && openTimeCandlestick.isAfter(lastKnownTick.getBeginTime())) {
@@ -326,21 +335,29 @@ public class TradingBotOnMovingTimeSeries {
 	      // Store the updated candlestick in the cache
 	      candlesticksCache.put(openTime, updateCandlestick);
 	      System.out.println(updateCandlestick);
+
 	      
 	      
           int endIndex = series.getEndIndex();
           newTick 	   = series.getLastTick();
-          Decimal amountToBePurchased = Decimal.TEN;
-          Decimal amountToBeSold      = Decimal.TEN; 
+          Decimal amountToBePurchased = Decimal.valueOf(40);//Decimal.TEN;
+          Decimal amountToBeSold      = Decimal.valueOf(40);//Decimal.TEN;
+          Double fee = 0.001;
           if (strategy.shouldEnter(endIndex)) {
               // Our strategy should enter
               System.out.println("Strategy should ENTER on " + endIndex);
               boolean entered = tradingRecord.enter(endIndex, newTick.getClosePrice(), amountToBePurchased);
               if (entered) {
                   Order entry = tradingRecord.getLastEntry();
+                  
+              	walletAmount  = walletAmount.minus(Decimal.valueOf( (1+fee) * entry.getPrice().toDouble() * entry.getAmount().toDouble()));              	 
+            	walletQuantity = walletQuantity.minus(Decimal.valueOf((1+fee) * entry.getAmount().toDouble()));
+                  
                   System.out.println("Entered on " + entry.getIndex()
                           + " (price=" + entry.getPrice().toDouble()
-                          + ", amount=" + entry.getAmount().toDouble() + ")");
+                          + ", amount=" + entry.getAmount().toDouble() 
+                          + " Wallet: " + walletAmount.toDouble()
+                		  + ")");
               }
           } else if (strategy.shouldExit(endIndex)) {
               // Our strategy should exit
@@ -348,9 +365,13 @@ public class TradingBotOnMovingTimeSeries {
               boolean exited = tradingRecord.exit(endIndex, newTick.getClosePrice(), amountToBeSold);
               if (exited) {
                   Order exit = tradingRecord.getLastExit();
+                  
+	              walletAmount  = walletAmount.plus(Decimal.valueOf((1-fee) * exit.getPrice().toDouble() * exit.getAmount().toDouble()));              	 
+	              walletQuantity = walletQuantity.plus(Decimal.valueOf((1-fee) * exit.getAmount().toDouble()));
+                  
                   System.out.println("Exited on " + exit.getIndex()
                           + " (price=" + exit.getPrice().toDouble()
-                          + ", amount=" + exit.getAmount().toDouble() + ")");
+                          + ", amount=" + exit.getAmount().toDouble() + " Wallet: " + walletAmount.toDouble()+ ")");
               }
           }
 	      
