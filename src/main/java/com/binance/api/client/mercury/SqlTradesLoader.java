@@ -1,5 +1,10 @@
 package com.binance.api.client.mercury;
 
+import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.sql.Timestamp;
+
 import java.sql.Connection;
 import java.util.Optional;
 import java.sql.ResultSet;
@@ -122,6 +127,107 @@ public class SqlTradesLoader {
 		}
 	}
 
+	
+	public TimeSeries loadSeriesFromJournal(Optional<Integer> maxticksOpt) {
+
+		Integer ticksizeinseconds = 1;
+		Integer maxticks = maxticksOpt.isPresent() ? maxticksOpt.get() : 0;
+
+		List<Tick> ticks = null;
+		ResultSet rs = null;
+
+		try {
+			ZonedDateTime beginTime = null;
+			ZonedDateTime endTime = null;
+			Long beginTimestamp = 0L;
+			Long endTimestamp = 0L;			
+			
+			rs = statement.executeQuery(
+					"SELECT min(opentime) AS beginTimestamp, max(opentime) AS endTimestamp"+
+					" FROM journal WHERE pair = '" + symbol + "'");
+			rs = statement.executeQuery(
+					"SELECT min(opentime) AS beginTimestamp, max(opentime) AS endTimestamp FROM journal WHERE pair = '"
+							+ symbol + "'");
+			if (rs.next()) {
+				
+				beginTimestamp = rs.getLong("beginTimestamp");
+				endTimestamp = rs.getLong("endTimestamp");
+				
+				beginTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(beginTimestamp),
+						ZoneId.systemDefault());
+				endTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(endTimestamp),
+						ZoneId.systemDefault());
+			}
+			rs.close();
+			
+			if ( maxticks > 0 ) {
+				beginTime = endTime.minusSeconds(ticksizeinseconds*maxticks);
+				
+			}
+
+			LocalDateTime beginTimeWithoutTimezone = beginTime.toLocalDateTime();
+			Timestamp begTimestamp = Timestamp.valueOf(beginTimeWithoutTimezone);
+			beginTimestamp = begTimestamp.getTime();		
+			//beginTimestamp = endTimestamp - 1000*maxticks*ticksizeinseconds; 
+			
+			// Building the empty ticks every one minute (60 seconds), yeah welcome in the crypto-world)
+			ticks = buildEmptyTicks(beginTime, endTime, ticksizeinseconds);
+			//ticks = buildEmptyTicks(beginTime, endTime, 300);
+
+			// Filling the ticks with candlesticks
+			rs = statement.executeQuery(
+					"SELECT opentime," + 
+					"       open," + 
+					"       high," + 
+					"       close," + 
+					"       closetime," + 
+					"       interval," + 
+					"       volume," + 
+					"       NumberOfTrades," + 
+					"       QuoteAssetVolume," + 
+					"       TakerBuyQuoteAssetVolume," + 
+					"       TakerBaseQuoteAssetVolume" + 
+					" FROM journal"+
+			        " WHERE pair = '" + symbol + "' AND opentime BETWEEN " + (beginTimestamp-1) + " AND " + (endTimestamp+1) + 
+			        " ORDER BY opentime ASC");
+			
+			while (rs.next()) { // read the result set System.out.println("OpenTime = " +
+				ZonedDateTime openTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(rs.getLong("opentime")),
+						ZoneId.systemDefault());
+				
+	    		for (int i = ticks.size() - 1; i >= 0; i--) {
+	    			if (ticks.get(i).inPeriod(openTime)) {
+	    				if ( ticks.get(i).getTrades() == 0 ) {
+		    				ticks.set(i, new BaseTick( openTime,
+									Decimal.valueOf( rs.getDouble("open")),
+									Decimal.valueOf( rs.getDouble("high")),
+									Decimal.valueOf( rs.getDouble("low")),
+									Decimal.valueOf( rs.getDouble("close")),
+									Decimal.valueOf( rs.getDouble("volume"))							
+										));    					
+	    				} 
+	    				ticks.get(i).addTrade(rs.getDouble("volume"), rs.getDouble("close"));    					
+	    			}
+	    		}
+			}
+			// Removing still empty ticks
+			removeEmptyTicks(ticks);
+
+		} catch (SQLException ioe) {
+			Logger.getLogger(SqlTradesLoader.class.getName()).log(Level.SEVERE, "Unable to load candlesticks from database",
+					ioe);
+		} finally {
+			try {
+				rs.close();
+			} catch (SQLException e) {
+				Logger.getLogger(SqlTradesLoader.class.getName()).log(Level.SEVERE,
+						"Unable to load candlesticks from database", e);
+			}
+		}
+
+		return new BaseTimeSeries("symbol", ticks);
+
+	}
 	public TimeSeries loadSeries(Optional<Integer> maxticksOpt) {
 		Integer ticksizeinseconds = 60;
 		Integer maxticks = maxticksOpt.isPresent() ? maxticksOpt.get() : 0;
@@ -179,7 +285,7 @@ public class SqlTradesLoader {
 			}
 		}
 
-		return new BaseTimeSeries("binance trades IOTA - BTC", ticks);
+		return new BaseTimeSeries(symbol, ticks);
 	}
 
 	public Connection getConnection() {

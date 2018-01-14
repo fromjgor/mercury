@@ -3,23 +3,9 @@ package com.binance.api.examples;
 import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.BinanceApiWebSocketClient;
-import com.binance.api.client.domain.OrderSide;
-import com.binance.api.client.domain.OrderType;
-import com.binance.api.client.domain.TimeInForce;
-import com.binance.api.client.domain.account.NewOrder;
-import com.binance.api.client.domain.account.Order;
-import com.binance.api.client.domain.account.request.AllOrdersRequest;
-import com.binance.api.client.domain.account.request.CancelOrderRequest;
-import com.binance.api.client.domain.account.request.OrderRequest;
-import com.binance.api.client.domain.account.request.OrderStatusRequest;
 import com.binance.api.client.domain.market.OrderBook;
 import com.binance.api.client.domain.market.OrderBookEntry;
-import com.binance.api.client.exception.BinanceApiException;
-import com.binance.api.client.mercury.CandlestickDumpDb;
-import com.binance.api.client.mercury.SecuritySettings;
-
-import static com.binance.api.client.domain.account.NewOrder.limitBuy;
-import static com.binance.api.client.domain.account.NewOrder.marketBuy;
+import com.binance.api.client.mercury.DeptCacheDumpDb;
 
 import java.math.BigDecimal;
 import java.util.Comparator;
@@ -28,8 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
-
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Illustrates how to use the depth event stream to create a local cache of
@@ -193,10 +177,8 @@ public class DepthCacheExample {
 				}
 			/*
 			else {
-				
-			
 					String sTestPair = "IOTABTC";
-					
+				
 				    BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance(SecuritySettings.sKEY,SecuritySettings.sSECRET);
 				    BinanceApiRestClient client = factory.newRestClient();
 
@@ -223,36 +205,22 @@ public class DepthCacheExample {
 
 				    
 				//   NewOrderResponse newOrderResponse = client.newOrder(limitBuy(sTestPair, TimeInForce.GTC, "2", "0.01768"));
-//				    System.out.println(newOrderResponse);				
-				
-				
+				//	 System.out.println(newOrderResponse);				
 			}*/
-
-			
 		}
-    	
-		// The official music of Dot Net Perls.
-/*	    for (int i = 37; i <= 32767; i += 200)
-	    {
 
-	        console.Beep(i, 100); //using System; 
-	    }
-*/		
+		/* The official music of Dot Net Perls.
+	    for (int i = 37; i <= 32767; i += 200)
+	    {	        console.Beep(i, 100); //using System;
+	    }*/		
 		
-		CandlestickDumpDb logger = new CandlestickDumpDb(symbol.toUpperCase());
+		DeptCacheDumpDb logger = new DeptCacheDumpDb(symbol.toUpperCase());
 		logger.setAsks(getAsks());
 		logger.setBids(getBids());
 		logger.setUpdateId(updateId);
 		logger.setEventTime(eventTime);
 // asynchronous call
 		logger.run();
-
-		// asynchronous call
-		
-		/*
-		Thread thread = new Thread(logger);
-		thread.start();
-		*/
 	}
 
 	/**

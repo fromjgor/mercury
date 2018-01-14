@@ -386,7 +386,7 @@ public class AggTradesCacheExample {
 		for (String  symbol : myFavoritesBTC) {
 			String pair = symbol + "BTC";
 			new AggTradesCacheExample(pair);
-			//new DepthCacheExample(pair);
+			new DepthCacheExample(pair);
 		    new CandlesticksCacheExample(pair, CandlestickInterval.ONE_MINUTE);
 		}
 		

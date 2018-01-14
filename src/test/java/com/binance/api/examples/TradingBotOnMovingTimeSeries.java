@@ -1,10 +1,25 @@
 package com.binance.api.examples;
 
 import org.ta4j.core.*;
+import org.ta4j.core.analysis.CashFlow;
+import org.ta4j.core.analysis.criteria.AverageProfitableTradesCriterion;
+import org.ta4j.core.analysis.criteria.RewardRiskRatioCriterion;
+import org.ta4j.core.analysis.criteria.TotalProfitCriterion;
+import org.ta4j.core.analysis.criteria.VersusBuyAndHoldCriterion;
+
 import java.util.Optional;
 import org.ta4j.core.indicators.SMAIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandWidthIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
+import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
+import org.ta4j.core.trading.rules.CrossedDownIndicatorRule;
+import org.ta4j.core.trading.rules.CrossedUpIndicatorRule;
 import org.ta4j.core.trading.rules.OverIndicatorRule;
+import org.ta4j.core.trading.rules.StopGainRule;
+import org.ta4j.core.trading.rules.StopLossRule;
 import org.ta4j.core.trading.rules.UnderIndicatorRule;
 import java.time.ZonedDateTime;
 
@@ -40,16 +55,6 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CopyOnWriteArrayList;
-
-import org.ta4j.core.BaseTick;
-import org.ta4j.core.BaseTimeSeries;
-import org.ta4j.core.Tick;
-import org.ta4j.core.TimeSeries;
-
-import org.ta4j.core.BaseTick;
-import org.ta4j.core.BaseTimeSeries;
-import org.ta4j.core.Tick;
-
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -63,15 +68,14 @@ public class TradingBotOnMovingTimeSeries {
 	
 
 	/**
-	 * Key is the minimal time stamp of the tick, and the value contains the aggregated trades
-	 * data, that is automatically collected whenever a new agg data stream event
+	 * Key is the minimal time stamp of the tick, and the value contains the candlestick 
+	 * data, that is automatically collected whenever a new candlestick data stream event
 	 * arrives.
 	 */
-	private static Map<Long, AggTrade> aggTradesCache  = new HashMap<>();
-
 	private static Map<Long, Candlestick> candlesticksCache = new HashMap<>();
+
 	/**
-	 * Tick duration 
+	 * FYI: Tick duration = 1 second (tbd) 
 	 */
 	private static final Duration tickDuration = Duration.ofMillis(1000);
 
@@ -137,41 +141,126 @@ public class TradingBotOnMovingTimeSeries {
     /** Close price of the last tick */
     private static Decimal LAST_TICK_CLOSE_PRICE;
 
-    /**
-     * Builds a moving time series (i.e. keeping only the maxTickCount last ticks)
-     * @param maxTickCount the number of ticks to keep in the time series (at maximum)
-     * @return a moving time series
-     */
-    private static TimeSeries initMovingTimeSeries(int maxTickCount) {
- 
-        //TimeSeries series = CsvTradesLoader.loadBitstampSeries();
-    	Integer intMaxTickcount = maxTickCount;
-		TimeSeries series = //SqlTradesLoader.getInstance(TradingBotOnMovingTimeSeries.symbol).loadSeries(Optional.of(intMaxTickcount));
-						    initializeMovingTimeSeries("QTUMBTC");
-        System.out.print("Initial tick count: " + series.getTickCount());
-        // Limitating the number of ticks to maxTickCount
-        series.setMaximumTickCount(maxTickCount);
-        LAST_TICK_CLOSE_PRICE = series.getTick(series.getEndIndex()).getClosePrice();
-        System.out.println(" (limited to " + maxTickCount + "), close price = " + LAST_TICK_CLOSE_PRICE);
-        return series;
-    }
-
-    /**
+     /**
      * @param series a time series
-     * @return a dummy strategy
+     * @return a super-puper strategy for crypto
      */
+    private static Strategy buildSuperPuperStrategy(TimeSeries series) {
+        if (series == null) {
+            throw new IllegalArgumentException("Series cannot be null");
+        }
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+
+        // Getting the simple moving average (SMA) of the close price over the last 5 ticks
+        SMAIndicator shortSma = new SMAIndicator(closePrice, 5);
+        // Here is the 5-ticks-SMA value at the 42nd index
+        //System.out.println("5-ticks-SMA value at the 42nd index: " + shortSma.getValue(42).toDouble());
+
+        // Getting a longer SMA (e.g. over the 30 last ticks)
+        SMAIndicator longSma = new SMAIndicator(closePrice, 30);
+
+
+        // Ok, now let's building our trading rules!
+
+        // Buying rules
+        // We want to buy:
+        //  - if the 5-ticks SMA crosses over 30-ticks SMA
+        //  - or if the price goes below a defined price (e.g $40.00)
+        Rule buyingRule = new CrossedUpIndicatorRule(shortSma, longSma)
+                .or(new CrossedDownIndicatorRule(closePrice, Decimal.valueOf("40")));
+        
+        // Selling rules
+        // We want to sell:
+        //  - if the 5-ticks SMA crosses under 30-ticks SMA
+        //  - or if if the price looses more than 5%
+        //  - or if the price earns more than 96%
+        Rule sellingRule = new CrossedDownIndicatorRule(shortSma, longSma)
+                .or(new StopLossRule(closePrice, Decimal.valueOf("5")))
+                .or(new StopGainRule(closePrice, Decimal.valueOf("96")));
+        
+        // Running our juicy trading strategy...
+        Strategy buySellSignals = new BaseStrategy(buyingRule, sellingRule);
+        return buySellSignals;
+
+/*        
+        // Getting the simple moving average (SMA) of the close price over the last 12 ticks
+        SMAIndicator shortSma = new SMAIndicator(closePrice, 12);
+        // Here is the 12-ticks-SMA value at the 42nd index
+        System.out.println("12-ticks-SMA value at the 42nd index: " + shortSma.getValue(42).toDouble());
+
+        // Getting a longer SMA (e.g. over the 26 last ticks)
+        SMAIndicator longSma = new SMAIndicator(closePrice, 26);
+
+        // Ok, now let's building our trading rules!
+
+        // Buying rules
+        // We want to buy:
+        //  - if the 12-ticks SMA crosses over 26-ticks SMA
+        //  - or if the price goes below a defined price (e.g $40.00)
+        Rule buyingRule = new CrossedUpIndicatorRule(shortSma, longSma)
+                .or(new CrossedDownIndicatorRule(closePrice, Decimal.valueOf("40")));
+        
+        // Selling rules
+        // We want to sell:
+        //  - if the 5-ticks SMA crosses under 30-ticks SMA
+        //  - or if if the price looses more than 3%
+        //  - or if the price earns more than 2%
+        Rule sellingRule = new CrossedDownIndicatorRule(shortSma, longSma)
+                .or(new StopLossRule(closePrice, Decimal.valueOf("3")))
+                .or(new StopGainRule(closePrice, Decimal.valueOf("2")));
+        
+
+        
+        // Getting bollinger bands
+        SMAIndicator sma = new SMAIndicator(closePrice, 12);
+        StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, 12);        
+        BollingerBandsMiddleIndicator bbmSMA = new BollingerBandsMiddleIndicator(sma);
+        BollingerBandsUpperIndicator bbuSMA = new BollingerBandsUpperIndicator(bbmSMA, standardDeviation);
+        BollingerBandsLowerIndicator bblSMA = new BollingerBandsLowerIndicator(bbmSMA, standardDeviation);
+        BollingerBandWidthIndicator bandwidth = new BollingerBandWidthIndicator(bbuSMA, bbmSMA, bblSMA);
+        
+        
+
+        
+        // Running our juicy trading strategy...
+        TimeSeriesManager seriesManager = new TimeSeriesManager(series);
+        TradingRecord tradingRecord = seriesManager.run(new BaseStrategy(buyingRule, sellingRule));
+        System.out.println("Number of trades for our strategy: " + tradingRecord.getTradeCount());
+
+        // Analysis
+
+        // Getting the cash flow of the resulting trades
+        CashFlow cashFlow = new CashFlow(series, tradingRecord);
+
+        // Getting the profitable trades ratio
+        AnalysisCriterion profitTradesRatio = new AverageProfitableTradesCriterion();
+        System.out.println("Profitable trades ratio: " + profitTradesRatio.calculate(series, tradingRecord));
+        // Getting the reward-risk ratio
+        AnalysisCriterion rewardRiskRatio = new RewardRiskRatioCriterion();
+        System.out.println("Reward-risk ratio: " + rewardRiskRatio.calculate(series, tradingRecord));
+
+        // Total profit of our strategy
+        // vs total profit of a buy-and-hold strategy
+        AnalysisCriterion vsBuyAndHold = new VersusBuyAndHoldCriterion(new TotalProfitCriterion());
+        System.out.println("Our profit vs buy-and-hold profit: " + vsBuyAndHold.calculate(series, tradingRecord));
+        
+        Strategy buySellSignals = new BaseStrategy(buyingRule, sellingRule);
+        return buySellSignals;
+*/    }
+    
     private static Strategy buildStrategy(TimeSeries series) {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
-
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+                
         @SuppressWarnings("static-access")
 		//Strategy buySellSignals  =  new RSI2Strategy().buildStrategy(series);
         //Strategy buySellSignals  =  new GlobalExtremaStrategy().buildStrategy(series);
-        //Strategy buySellSignals  =  new CCICorrectionStrategy().buildStrategy(series);
-        
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        //Strategy buySellSignals  =  new CCICorrectionStrategy().buildStrategy(series);        
+
         SMAIndicator sma = new SMAIndicator(closePrice, 12);
+        
         //SMAIndicator sma = new SMAIndicator(closePrice, 7);
 
         // Signals
@@ -184,18 +273,70 @@ public class TradingBotOnMovingTimeSeries {
         return buySellSignals;
     }
 
-    /**
-     * Generates a random decimal number between min and max.
-     * @param min the minimum bound
-     * @param max the maximum bound
-     * @return a random decimal number between min and max
-     */
-    private static Decimal randDecimal(Decimal min, Decimal max) {
-        Decimal randomDecimal = null;
-        if (min != null && max != null && min.isLessThan(max)) {
-            randomDecimal = max.minus(min).multipliedBy(Decimal.valueOf(Math.random())).plus(min);
-        }
-        return randomDecimal;
+    private static void backtest(int maxtickcount) {
+        // Getting a time series (from any provider: CSV, web service, etc.)
+        TimeSeries series = SqlTradesLoader.getInstance(TradingBotOnMovingTimeSeries.symbol).
+        		loadSeriesFromJournal(Optional.of(maxtickcount));
+
+        // Getting the close price of the ticks
+        Decimal firstClosePrice = series.getTick(0).getClosePrice();
+        System.out.println("First close price: " + firstClosePrice.toDouble());
+        // Or within an indicator:
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        // Here is the same close price:
+        System.out.println(firstClosePrice.isEqual(closePrice.getValue(0))); // equal to firstClosePrice
+
+        // Getting the simple moving average (SMA) of the close price over the last 5 ticks
+        SMAIndicator shortSma = new SMAIndicator(closePrice, 5);
+        // Here is the 5-ticks-SMA value at the 42nd index
+        System.out.println("5-ticks-SMA value at the 42nd index: " + shortSma.getValue(42).toDouble());
+
+        // Getting a longer SMA (e.g. over the 30 last ticks)
+        SMAIndicator longSma = new SMAIndicator(closePrice, 30);
+
+
+        // Ok, now let's building our trading rules!
+
+        // Buying rules
+        // We want to buy:
+        //  - if the 5-ticks SMA crosses over 30-ticks SMA
+        //  - or if the price goes below a defined price (e.g $40.00)
+        Rule buyingRule = new CrossedUpIndicatorRule(shortSma, longSma)
+                .or(new CrossedDownIndicatorRule(closePrice, Decimal.valueOf("40")));
+        
+        // Selling rules
+        // We want to sell:
+        //  - if the 5-ticks SMA crosses under 30-ticks SMA
+        //  - or if if the price looses more than 3%
+        //  - or if the price earns more than 2%
+        Rule sellingRule = new CrossedDownIndicatorRule(shortSma, longSma)
+                .or(new StopLossRule(closePrice, Decimal.valueOf("3")))
+                .or(new StopGainRule(closePrice, Decimal.valueOf("2")));
+        
+        // Running our juicy trading strategy...
+        TimeSeriesManager seriesManager = new TimeSeriesManager(series);
+        TradingRecord tradingRecord = seriesManager.run(new BaseStrategy(buyingRule, sellingRule));
+        System.out.println("Number of trades for our strategy: " + tradingRecord.getTradeCount());
+
+
+        // Analysis
+
+        // Getting the cash flow of the resulting trades
+        CashFlow cashFlow = new CashFlow(series, tradingRecord);
+
+        // Getting the profitable trades ratio
+        AnalysisCriterion profitTradesRatio = new AverageProfitableTradesCriterion();
+        System.out.println("Profitable trades ratio: " + profitTradesRatio.calculate(series, tradingRecord));
+        // Getting the reward-risk ratio
+        AnalysisCriterion rewardRiskRatio = new RewardRiskRatioCriterion();
+        System.out.println("Reward-risk ratio: " + rewardRiskRatio.calculate(series, tradingRecord));
+
+        // Total profit of our strategy
+        // vs total profit of a buy-and-hold strategy
+        AnalysisCriterion vsBuyAndHold = new VersusBuyAndHoldCriterion(new TotalProfitCriterion());
+        System.out.println("Our profit vs buy-and-hold profit: " + vsBuyAndHold.calculate(series, tradingRecord));
+
+        // Your turn!
     }
 
     private static Decimal walletAmount   = Decimal.valueOf(1);//BTC
@@ -251,17 +392,7 @@ public class TradingBotOnMovingTimeSeries {
 					newTicks.get(i).addTrade(amount, price);
 					LAST_TICK_CLOSE_PRICE = Decimal.valueOf(candlestickBar.getClose());
 					// Store this candlestick to the database    
-				    new CandlestickDumpDb(symbol.toUpperCase()).insert(candlestickBar);
-				      
-					/*series.addTick( new BaseTick(
-					tradeTime,
-					Decimal.valueOf(candlestickBar.getOpen()),
-					Decimal.valueOf(candlestickBar.getHigh()),
-					Decimal.valueOf(candlestickBar.getLow()),
-					Decimal.valueOf(candlestickBar.getClose()), 
-					Decimal.valueOf(candlestickBar.getVolume())							
-						)			);*/			
-
+				    new CandlestickDumpDb(symbol.toUpperCase()).setInterval(interval).setCandlestick(candlestickBar).run();
     			}
     		}
     	}
@@ -270,7 +401,8 @@ public class TradingBotOnMovingTimeSeries {
         series.setMaximumTickCount(maxTickCount);
         
         // Building the trading strategy
-        Strategy strategy = buildStrategy(series);
+        ///////////////////////////////Strategy strategy = buildStrategy(series);
+        Strategy strategy = buildSuperPuperStrategy(series);
         
         // Initializing the trading history
         TradingRecord tradingRecord = new BaseTradingRecord();
@@ -300,7 +432,6 @@ public class TradingBotOnMovingTimeSeries {
 	      updateCandlestick.setQuoteAssetVolume(response.getQuoteAssetVolume());
 	      updateCandlestick.setTakerBuyQuoteAssetVolume(response.getTakerBuyQuoteAssetVolume());
 	      updateCandlestick.setTakerBuyBaseAssetVolume(response.getTakerBuyQuoteAssetVolume());
-		  new CandlestickDumpDb(symbol.toUpperCase()).insert(updateCandlestick);
 		  
 	      long openTimestamp = response.getOpenTime();
 	      ZonedDateTime openTimeCandlestick = ZonedDateTime.ofInstant(Instant.ofEpochMilli(openTimestamp), ZoneId.systemDefault());
@@ -327,22 +458,23 @@ public class TradingBotOnMovingTimeSeries {
 	    	 newTick.addTrade(updateCandlestick.getVolume(), response.getClose());
 	    	 LAST_TICK_CLOSE_PRICE = Decimal.valueOf(response.getClose());	    	  
 	      }
-    	  
 	
-	      // Store this candlestick to the database    
-	      //new CandlestickDumpDb(symbol.toUpperCase()).insert(updateCandlestick);
-	      
 	      // Store the updated candlestick in the cache
 	      candlesticksCache.put(openTime, updateCandlestick);
+	      // Store this candlestick to the database (async call)       	      
+		  new CandlestickDumpDb(symbol.toUpperCase()).setInterval(interval).setCandlestick(updateCandlestick).run();
+	      	      
 	      System.out.println(updateCandlestick);
 
-	      
+/* trade chapter */	      
 	      
           int endIndex = series.getEndIndex();
           newTick 	   = series.getLastTick();
           Decimal amountToBePurchased = Decimal.valueOf(40);//Decimal.TEN;
           Decimal amountToBeSold      = Decimal.valueOf(40);//Decimal.TEN;
-          Double fee = 0.001;
+          
+          Double fee = 0.001;// actually the value is 0.0005 at binance.com
+          
           if (strategy.shouldEnter(endIndex)) {
               // Our strategy should enter
               System.out.println("Strategy should ENTER on " + endIndex);
@@ -372,79 +504,40 @@ public class TradingBotOnMovingTimeSeries {
                   System.out.println("Exited on " + exit.getIndex()
                           + " (price=" + exit.getPrice().toDouble()
                           + ", amount=" + exit.getAmount().toDouble() + " Wallet: " + walletAmount.toDouble()+ ")");
+                  
+                  
+                  // Analysis
+
+							                  // Getting the cash flow of the resulting trades
+							                  /*CashFlow cashFlow = new CashFlow(series, tradingRecord);
+							                  for( int i=0; i<cashFlow.getSize()-1; i++) {
+							                	  System.out.println("Cashflow on step #: " + i + " = " + cashFlow.getValue(i));
+							                  }*/
+                  
+                  // Getting the profitable trades ratio
+                  AnalysisCriterion profitTradesRatio = new AverageProfitableTradesCriterion();
+                  System.out.println("Profitable trades ratio: " + profitTradesRatio.calculate(series, tradingRecord));
+                  // Getting the reward-risk ratio
+                  AnalysisCriterion rewardRiskRatio = new RewardRiskRatioCriterion();
+                  System.out.println("Reward-risk ratio: " + rewardRiskRatio.calculate(series, tradingRecord));
+
+                  // Total profit of our strategy
+                  // vs total profit of a buy-and-hold strategy
+                  AnalysisCriterion vsBuyAndHold = new VersusBuyAndHoldCriterion(new TotalProfitCriterion());
+                  System.out.println("Our profit vs buy-and-hold profit: " + vsBuyAndHold.calculate(series, tradingRecord));
               }
           }
 	      
 	    });
     }
     
-    /**
-     * Generates a random tick.
-     * @return a random tick
-     */
-    private static Tick generateRandomTick() {
-    	
-        final Decimal maxRange = Decimal.valueOf("0.03"); // 3.0%
-        Decimal openPrice = LAST_TICK_CLOSE_PRICE;
-        Decimal minPrice = openPrice.minus(openPrice.multipliedBy(maxRange.multipliedBy(Decimal.valueOf(Math.random()))));
-        Decimal maxPrice = openPrice.plus(openPrice.multipliedBy(maxRange.multipliedBy(Decimal.valueOf(Math.random()))));
-        Decimal closePrice = randDecimal(minPrice, maxPrice);
-        LAST_TICK_CLOSE_PRICE = closePrice;
-        return new BaseTick(ZonedDateTime.now(), openPrice, maxPrice, minPrice, closePrice, Decimal.ONE);
-    }
-
     public static void main(String[] args) throws InterruptedException {
     
         System.out.println("********************** Initialization **********************");
+                
         run("QTUMBTC",1000);
-/*
-        // Getting the time series
-        TimeSeries series = initMovingTimeSeries(500);
-
-        // Building the trading strategy
-        Strategy strategy = buildStrategy(series);
         
-        // Initializing the trading history
-        TradingRecord tradingRecord = new BaseTradingRecord();
-        System.out.println("************************************************************");
-        
-        /**
-         * We run the strategy for the 50 next ticks.
-         */
-/*        
-        for (int i = 0; i < 500; i++) {
-
-            // New tick
-            Thread.sleep(30); // I know...
-            Tick newTick = generateRandomTick();
-            System.out.println("------------------------------------------------------\n"
-                    + "Tick "+i+" added, close price = " + newTick.getClosePrice().toDouble());
-            series.addTick(newTick);
-            
-            int endIndex = series.getEndIndex();
-            if (strategy.shouldEnter(endIndex)) {
-                // Our strategy should enter
-                System.out.println("Strategy should ENTER on " + endIndex);
-                boolean entered = tradingRecord.enter(endIndex, newTick.getClosePrice(), Decimal.TEN);
-                if (entered) {
-                    Order entry = tradingRecord.getLastEntry();
-                    System.out.println("Entered on " + entry.getIndex()
-                            + " (price=" + entry.getPrice().toDouble()
-                            + ", amount=" + entry.getAmount().toDouble() + ")");
-                }
-            } else if (strategy.shouldExit(endIndex)) {
-                // Our strategy should exit
-                System.out.println("Strategy should EXIT on " + endIndex);
-                boolean exited = tradingRecord.exit(endIndex, newTick.getClosePrice(), Decimal.TEN);
-                if (exited) {
-                    Order exit = tradingRecord.getLastExit();
-                    System.out.println("Exited on " + exit.getIndex()
-                            + " (price=" + exit.getPrice().toDouble()
-                            + ", amount=" + exit.getAmount().toDouble() + ")");
-                }
-            }
-        }
-        */
+        //backtest(60*60*12);
     }
     
 }

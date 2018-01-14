@@ -20,11 +20,4 @@
 		<nature>org.eclipse.jdt.core.javanature</nature>
 		<nature>org.eclipse.m2e.core.maven2Nature</nature>
 	</natures>
-	<linkedResources>
-		<link>
-			<name>mercury</name>
-			<type>2</type>
-			<location>C:/SAP/mercury/mercury/src/main/java/com/binance/api/client/mercury</location>
-		</link>
-	</linkedResources>
 </projectDescription>

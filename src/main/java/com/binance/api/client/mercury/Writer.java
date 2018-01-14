@@ -107,12 +107,11 @@ public class Writer {
 	public static Writer getNext() {
 		String prefix = "orderbook";
 		String key = prefix;
-		Integer count = 0;
-
+		/*Integer count = 0;
 		while (writerIterator.hasNext()) {
 			++count;
 			key = writerIterator.next();
-			if (key.equals("orderbook3") && count > 3) {
+			if (key.equals("orderbook") && count > 1) {
 				// wait for a writer to be unlocked
 				try {
 					Thread.sleep(50);
@@ -128,10 +127,7 @@ public class Writer {
 				key = prefix + count.toString();
 
 			}
-		}
-
-		Writer writer = new Writer(key);
-
-		return writer;
+		}*/
+		return new Writer(key);
 	}
 }
