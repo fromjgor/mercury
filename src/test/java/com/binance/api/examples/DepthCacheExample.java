@@ -66,11 +66,11 @@ public class DepthCacheExample {
 
 		client.onDepthEvent(symbol.toLowerCase(), response -> {
 			if (response.getUpdateId() > lastUpdateId) {
-				System.out.println(response);
+				// System.out.println(response);
 				lastUpdateId = response.getUpdateId();
 				updateOrderBook(getAsks(), response.getAsks());
 				updateOrderBook(getBids(), response.getBids());
-//				printDepthCache();
+				// printDepthCache();
 				storeDepthCache(response.getSymbol(), response.getUpdateId(), response.getEventTime());// log order book
 																										// to the
 																										// database
@@ -133,93 +133,91 @@ public class DepthCacheExample {
 	 * bid price in the book.
 	 */
 	private void printDepthCache() {
-		System.out.println(depthCache);
-		System.out.println("ASKS:");
+		// System.out.println(depthCache);
+		// System.out.println("ASKS:");
 		getAsks().entrySet().forEach(entry -> System.out.println(toDepthCacheEntryString(entry)));
-		System.out.println("BIDS:");
+		// System.out.println("BIDS:");
 		getBids().entrySet().forEach(entry -> System.out.println(toDepthCacheEntryString(entry)));
-		System.out.println("BEST ASK: " + toDepthCacheEntryString(getBestAsk()));
-		System.out.println("BEST BID: " + toDepthCacheEntryString(getBestBid()));
+		// System.out.println("BEST ASK: " + toDepthCacheEntryString(getBestAsk()));
+		// System.out.println("BEST BID: " + toDepthCacheEntryString(getBestBid()));
 	}
 
 	private void storeDepthCache(String symbol, long updateId, long eventTime) {
 
-		BigDecimal priceLimit = new BigDecimal( 0.00 );
-		BigDecimal priceLossLimit = new BigDecimal( 0.00 );
-		BigDecimal bestAskPrice = getBestAsk().getKey();  
+		BigDecimal priceLimit = new BigDecimal(0.00);
+		BigDecimal priceLossLimit = new BigDecimal(0.00);
+		BigDecimal bestAskPrice = getBestAsk().getKey();
 		BigDecimal bestBidPrice = getBestBid().getKey();
-		
-		if( symbol.compareTo("QTUMBTC") == 0) {
-			priceLimit = new BigDecimal( 0.0040 );
-			priceLossLimit = new BigDecimal( 0.003);
-	
-			
-		}/* else if( symbol.compareTo("NEOBTC") == 0) {
-			priceLimit = new BigDecimal( 0.0049 );
-			priceLossLimit = new BigDecimal( 0.0048 );
-			
-		}*/ else if( symbol.compareTo("FUELBTC") == 0) {
-		priceLimit = new BigDecimal( 0.00029311 );
-		priceLossLimit = new BigDecimal( 0.000028936 );
-		
-	}
 
-		if( priceLimit.compareTo( priceLossLimit ) > 0 ) 	
-			{
-			if ( bestAskPrice.compareTo(priceLimit) > 0 ||   
-					 bestBidPrice.compareTo(priceLossLimit) < 0 ) {
-				System.out.println(" bestAskPrice | priceLimit | priceLossLimit ");
-				System.out.println(bestAskPrice);
-				System.out.println(priceLimit);
-				System.out.println(priceLossLimit);
+		if (symbol.compareTo("QTUMBTC") == 0) {
+			priceLimit = new BigDecimal(0.0040);
+			priceLossLimit = new BigDecimal(0.003);
 
-		    	java.awt.Toolkit.getDefaultToolkit().beep();			
-				}
-			/*
-			else {
-					String sTestPair = "IOTABTC";
-				
-				    BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance(SecuritySettings.sKEY,SecuritySettings.sSECRET);
-				    BinanceApiRestClient client = factory.newRestClient();
+		} /*
+			 * else if( symbol.compareTo("NEOBTC") == 0) { priceLimit = new BigDecimal(
+			 * 0.0049 ); priceLossLimit = new BigDecimal( 0.0048 );
+			 * 
+			 * }
+			 */ else if (symbol.compareTo("FUELBTC") == 0) {
+			priceLimit = new BigDecimal(0.00029311);
+			priceLossLimit = new BigDecimal(0.000028936);
 
-				    // Getting list of open orders
-				    List<Order> openOrders = client.getOpenOrders(new OrderRequest(sTestPair));
-				    System.out.println(openOrders);
-
-				    // Getting list of all orders with a limit of 10 (-> get top 10)
-				    List<Order> allOrders = client.getAllOrders(new AllOrdersRequest(sTestPair).limit(10));
-				    System.out.println(allOrders);
-
-				    // Get status of a particular order
-				    //Order order = client.getOrderStatus(new OrderStatusRequest(sTestPair, 1986860L)); // replace 1986860L by your order-id 
-				    //System.out.println(order);
-
-
-				    // Placing a test LIMIT order
-				    //client.newOrderTest(new NewOrder(sTestPair, OrderSide.SELL, OrderType.LIMIT, TimeInForce.GTC, "10", "1.768"));
-				    // Placing a test MARKET order
-				    //client.newOrderTest(marketBuy(sTestPair, "1000"));
-
-				// Placing a real LIMIT order
-				    client.newOrder(new NewOrder(sTestPair, OrderSide.SELL, OrderType.LIMIT, TimeInForce.GTC, "9", "0.0001"));
-
-				    
-				//   NewOrderResponse newOrderResponse = client.newOrder(limitBuy(sTestPair, TimeInForce.GTC, "2", "0.01768"));
-				//	 System.out.println(newOrderResponse);				
-			}*/
 		}
 
-		/* The official music of Dot Net Perls.
-	    for (int i = 37; i <= 32767; i += 200)
-	    {	        console.Beep(i, 100); //using System;
-	    }*/		
-		
+		if (priceLimit.compareTo(priceLossLimit) > 0) {
+			if (bestAskPrice.compareTo(priceLimit) > 0 || bestBidPrice.compareTo(priceLossLimit) < 0) {
+				/**
+				 * System.out.println(" bestAskPrice | priceLimit | priceLossLimit ");
+				 * System.out.println(bestAskPrice); System.out.println(priceLimit);
+				 * System.out.println(priceLossLimit);
+				 */
+
+				////// java.awt.Toolkit.getDefaultToolkit().beep();
+			}
+			/*
+			 * else { String sTestPair = "IOTABTC";
+			 * 
+			 * BinanceApiClientFactory factory =
+			 * BinanceApiClientFactory.newInstance(SecuritySettings.sKEY,SecuritySettings.
+			 * sSECRET); BinanceApiRestClient client = factory.newRestClient();
+			 * 
+			 * // Getting list of open orders List<Order> openOrders =
+			 * client.getOpenOrders(new OrderRequest(sTestPair));
+			 * System.out.println(openOrders);
+			 * 
+			 * // Getting list of all orders with a limit of 10 (-> get top 10) List<Order>
+			 * allOrders = client.getAllOrders(new AllOrdersRequest(sTestPair).limit(10));
+			 * System.out.println(allOrders);
+			 * 
+			 * // Get status of a particular order //Order order = client.getOrderStatus(new
+			 * OrderStatusRequest(sTestPair, 1986860L)); // replace 1986860L by your
+			 * order-id //System.out.println(order);
+			 * 
+			 * 
+			 * // Placing a test LIMIT order //client.newOrderTest(new NewOrder(sTestPair,
+			 * OrderSide.SELL, OrderType.LIMIT, TimeInForce.GTC, "10", "1.768")); // Placing
+			 * a test MARKET order //client.newOrderTest(marketBuy(sTestPair, "1000"));
+			 * 
+			 * // Placing a real LIMIT order client.newOrder(new NewOrder(sTestPair,
+			 * OrderSide.SELL, OrderType.LIMIT, TimeInForce.GTC, "9", "0.0001"));
+			 * 
+			 * 
+			 * // NewOrderResponse newOrderResponse = client.newOrder(limitBuy(sTestPair,
+			 * TimeInForce.GTC, "2", "0.01768")); // System.out.println(newOrderResponse); }
+			 */
+		}
+
+		/*
+		 * The official music of Dot Net Perls. for (int i = 37; i <= 32767; i += 200) {
+		 * console.Beep(i, 100); //using System; }
+		 */
+
 		DeptCacheDumpDb logger = new DeptCacheDumpDb(symbol.toUpperCase());
 		logger.setAsks(getAsks());
 		logger.setBids(getBids());
 		logger.setUpdateId(updateId);
 		logger.setEventTime(eventTime);
-// asynchronous call
+		// asynchronous call
 		logger.run();
 	}
 
@@ -231,8 +229,9 @@ public class DepthCacheExample {
 	}
 
 	public static void main(String[] args) {
-		/*new DepthCacheExample("ETHBTC");
-		new DepthCacheExample("IOTAETH");*/
+		/*
+		 * new DepthCacheExample("ETHBTC"); new DepthCacheExample("IOTAETH");
+		 */
 		new DepthCacheExample("IOTABTC");
 	}
 }

@@ -1,5 +1,9 @@
 package com.binance.api.examples;
 
+import java.time.Instant;
+import java.time.temporal.Temporal;
+import java.time.temporal.ChronoUnit;
+
 import org.ta4j.core.*;
 import org.ta4j.core.trading.rules.*;
 import org.ta4j.core.analysis.CashFlow;
@@ -8,10 +12,18 @@ import org.ta4j.core.analysis.criteria.RewardRiskRatioCriterion;
 import org.ta4j.core.analysis.criteria.TotalProfitCriterion;
 import org.ta4j.core.analysis.criteria.VersusBuyAndHoldCriterion;
 
+import org.ta4j.core.BaseTick;
+import org.ta4j.core.BaseTimeSeries;
+import org.ta4j.core.Decimal;
+import org.ta4j.core.Tick;
+import org.ta4j.core.TimeSeries;
+
 import java.util.Optional;
 
 import org.ta4j.core.indicators.EMAIndicator;
+import org.ta4j.core.indicators.MACDIndicator;
 import org.ta4j.core.indicators.SMAIndicator;
+import org.ta4j.core.indicators.RSIIndicator;
 import org.ta4j.core.indicators.StochasticRSIIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandWidthIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
@@ -22,28 +34,25 @@ import org.ta4j.core.indicators.keltner.KeltnerChannelLowerIndicator;
 import org.ta4j.core.indicators.keltner.KeltnerChannelMiddleIndicator;
 import org.ta4j.core.indicators.keltner.KeltnerChannelUpperIndicator;
 import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
-import org.ta4j.core.trading.rules.CrossedDownIndicatorRule;
-import org.ta4j.core.trading.rules.CrossedUpIndicatorRule;
-import org.ta4j.core.trading.rules.OverIndicatorRule;
-import org.ta4j.core.trading.rules.StopGainRule;
-import org.ta4j.core.trading.rules.StopLossRule;
-import org.ta4j.core.trading.rules.UnderIndicatorRule;
+
 import java.time.ZonedDateTime;
 
 import com.binance.api.client.mercury.*;
 
 import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
-
+import com.binance.api.client.BinanceApiWebSocketClient;
 import com.binance.api.client.domain.market.Candlestick;
+import com.binance.api.client.domain.market.AggTrade;
 import com.binance.api.client.domain.market.CandlestickInterval;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
-
+import java.util.ArrayList;
 import java.util.HashMap;
 
 public class TradingBotOnMovingTimeSeries {
@@ -56,16 +65,237 @@ public class TradingBotOnMovingTimeSeries {
 	 * candlestick data, that is automatically collected whenever a new candlestick
 	 * data stream event arrives.
 	 */
+	private static List<Tick> ticks = new ArrayList<>();
 	private static Map<Long, Candlestick> candlesticksCache = new HashMap<>();
+	private static Map<Long, AggTrade> aggTradesCache = new HashMap<>();
+	private static TimeSeries series = null;
+	// Initializing the trading history
+	private static TradingRecord tradingRecord = new BaseTradingRecord();
+
+	// Building the trading strategy
+	private static Strategy strategy = null;
 
 	/**
 	 * FYI: Tick duration = 1 second (tbd)
 	 */
-	private static final Duration tickDuration = Duration.ofMillis(1000);
+	private static final Duration tickDuration = Duration.ofSeconds(SqlTradesLoader.getTicksPerSecond());
 
 	/**
-	 * Initializes the Trades cache by using the REST API.
+	 * Initializes the aggTrades cache by using the REST API.
 	 */
+	private void initializeAggTradesCache(String symbol) {
+		BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance();
+		BinanceApiRestClient client = factory.newRestClient();
+		List<AggTrade> aggTrades = client.getAggTrades(symbol.toUpperCase());
+
+		// Check server time
+		tradeSessionStartTime = client.getServerTime();
+		long startTimestamp = tradeSessionStartTime;
+		long endTimestamp = tradeSessionStartTime;
+
+		// this.aggTradesCache = new HashMap<>();
+		for (AggTrade aggTrade : aggTrades) {
+
+			// Long currentTimestamp = aggTrade.getTradeTime();
+			Long currentTimestamp = ((aggTrade.getTradeTime() + 500) / 1000) * 1000;
+
+			if (currentTimestamp <= startTimestamp)
+				startTimestamp = currentTimestamp;
+			if (currentTimestamp >= endTimestamp)
+				endTimestamp = currentTimestamp;
+
+			aggTradesCache.put(aggTrade.getAggregatedTradeId(), aggTrade);
+		}
+
+		/**
+		 * Generate and calculate ticks:
+		 * 
+		 * Depending on the type of stock chart you want to create, you must include a
+		 * specific combination of data series in the cache - and put the data series in
+		 * order:
+		 * 
+		 * - Volume traded - Opening price - High price - Low price - Closing price
+		 */
+		ZonedDateTime beginTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(startTimestamp), ZoneId.systemDefault());
+		ZonedDateTime endTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(endTimestamp), ZoneId.systemDefault());
+
+		ticks = SqlTradesLoader.buildEmptyTicks(beginTime, endTime, SqlTradesLoader.getTicksPerSecond());
+
+		for (AggTrade aggTrade : aggTrades) {
+
+			Long currentTimestamp = aggTrade.getTradeTime();
+			ZonedDateTime tradeTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(currentTimestamp),
+					ZoneId.systemDefault());
+
+			for (Tick tick : ticks) {
+				if (tick.inPeriod(tradeTime)) {
+					Decimal volume = Decimal.valueOf(aggTrade.getQuantity());
+					Decimal price = Decimal.valueOf(aggTrade.getPrice());
+					tick.addTrade(volume, price);
+					break;
+				}
+			}
+		}
+		SqlTradesLoader.removeEmptyTicks(ticks);
+	}
+
+	/**
+	 */
+	private void startAggTradesEventStreaming(String symbol, int maxTickCount) {
+		BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance();
+		BinanceApiWebSocketClient client = factory.newWebSocketClient();
+
+		// TimeSeries series = new BaseTimeSeries(symbol, ticks);
+		series = new BaseTimeSeries(symbol, ticks);
+		series.setMaximumTickCount(maxTickCount);
+		// strategy = buildStrategy(series);
+		strategy = buildStrategyTrendFollowing(series);// buildStrategy(series);
+		System.out.println("************************************************************");
+
+		client.onAggTradeEvent(symbol.toLowerCase(), response -> {
+			Long aggregatedTradeId = response.getAggregatedTradeId();
+			AggTrade updateAggTrade = aggTradesCache.get(aggregatedTradeId);
+			if (updateAggTrade == null) {
+				// new agg trade
+				updateAggTrade = new AggTrade();
+			}
+			updateAggTrade.setAggregatedTradeId(aggregatedTradeId);
+			updateAggTrade.setPrice(response.getPrice());
+			updateAggTrade.setQuantity(response.getQuantity());
+			updateAggTrade.setFirstBreakdownTradeId(response.getFirstBreakdownTradeId());
+			updateAggTrade.setLastBreakdownTradeId(response.getLastBreakdownTradeId());
+			updateAggTrade.setBuyerMaker(response.isBuyerMaker());
+
+			Long ts = response.getTradeTime();
+			// round off the timestamp to nearest second:
+			ts = ((response.getTradeTime() + 500) / 1000) * 1000;
+			updateAggTrade.setTradeTime(ts);
+
+			// Store the updated agg trade in the cache
+			aggTradesCache.put(aggregatedTradeId, updateAggTrade);
+			log(updateAggTrade); // store to db
+
+			ZonedDateTime updateAggTradeTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(ts),
+					ZoneId.systemDefault());
+
+			Tick lastick = series.getLastTick();
+
+			/**
+			 * inPeriod() returns false if endTime is equal or less to the given timestamp.
+			 * Since all ticks within a second will end up having the same ts, inPeriod()
+			 * must return true.
+			 */
+
+			// if ( lastick.inPeriod(updateAggTradeTime) ) {
+			if (!updateAggTradeTime.isBefore(lastick.getBeginTime())
+					/* bugfix that works for me: to make sure that endTime is included in period! */
+					&& (updateAggTradeTime.isEqual(lastick.getEndTime())
+							|| updateAggTradeTime.isBefore(lastick.getEndTime()))) {
+
+				lastick.addTrade(response.getQuantity(), response.getPrice());
+				System.out.println("tick #" + series.getEndIndex() + " updated with closing price: "
+						+ lastick.getClosePrice() + " [" + lastick.getBeginTime() + " :" + lastick.getEndTime() + "]");
+			} else if (updateAggTradeTime.isAfter(series.getLastTick().getEndTime())) {
+
+				// Duration tickDuration = Duration.ofSeconds(duration);
+				ZonedDateTime tickEndTime = lastick.getBeginTime();
+				do {
+					tickEndTime = tickEndTime.plus(tickDuration);
+				} while (tickEndTime.isBefore(updateAggTradeTime));
+
+				try {
+					Tick nextick = new BaseTick(tickDuration, tickEndTime);
+					nextick.addTrade(Decimal.valueOf(response.getQuantity()), Decimal.valueOf(response.getPrice()));
+					ticks.add(nextick);
+
+					series = new BaseTimeSeries(symbol, ticks);
+					series.setMaximumTickCount(maxTickCount);
+					strategy = buildStrategyTrendFollowing(series);// buildStrategy(series);
+					/*
+					 * if (nextick.inPeriod(updateAggTradeTime)) { if
+					 * (lastick.getEndTime().isBefore(nextick.getEndTime())) {
+					 * series.addTick(nextick); System.out.println("new tick added #" +
+					 * series.getEndIndex()); } }
+					 */
+				} catch (java.lang.IllegalArgumentException e) {
+					System.out.println(e);
+				}
+			}
+
+			System.out.println(updateAggTrade);
+
+			/* trade chapter */
+
+			int endIndex = series.getEndIndex();
+			Tick newTick = series.getLastTick();
+			Decimal amountToBePurchased = Decimal.valueOf(40);// Decimal.TEN;
+			Decimal amountToBeSold = Decimal.valueOf(40);// Decimal.TEN;
+
+			Double fee = 0.001;// actually the value is 0.0005 at binance.com
+
+			// rebuild strategy (otherwise s = strategy)
+			if (strategy.shouldEnter(endIndex)) {
+
+				// Our strategy should enter
+				System.out.println("Strategy should ENTER on " + endIndex);
+				boolean entered = tradingRecord.enter(endIndex, newTick.getClosePrice(), amountToBePurchased);
+				if (entered) {
+					java.awt.Toolkit.getDefaultToolkit().beep();
+					Order entry = tradingRecord.getLastEntry();
+
+					walletAmount = walletAmount.minus(
+							Decimal.valueOf((1 + fee) * entry.getPrice().toDouble() * entry.getAmount().toDouble()));
+					walletQuantity = walletQuantity.minus(Decimal.valueOf((1 + fee) * entry.getAmount().toDouble()));
+
+					System.out.println("Entered on " + entry.getIndex() + " (price=" + entry.getPrice().toDouble()
+							+ ", amount=" + entry.getAmount().toDouble() + " Wallet: " + walletAmount.toDouble() + ")");
+				}
+			} else if (strategy.shouldExit(endIndex)) {
+				// Our strategy should exit
+
+				System.out.println("Strategy should EXIT on " + endIndex);
+				boolean exited = tradingRecord.exit(endIndex, newTick.getClosePrice(), amountToBeSold);
+				if (exited) {
+					for (int i = 0; i < 3; i++)
+						java.awt.Toolkit.getDefaultToolkit().beep();
+
+					Order exit = tradingRecord.getLastExit();
+
+					walletAmount = walletAmount.plus(
+							Decimal.valueOf((1 - fee) * exit.getPrice().toDouble() * exit.getAmount().toDouble()));
+					walletQuantity = walletQuantity.plus(Decimal.valueOf((1 - fee) * exit.getAmount().toDouble()));
+
+					System.out.println("Exited on " + exit.getIndex() + " (price=" + exit.getPrice().toDouble()
+							+ ", amount=" + exit.getAmount().toDouble() + " Wallet: " + walletAmount.toDouble() + ")");
+
+					// Analysis
+
+					// Getting the cash flow of the resulting trades
+					/*
+					 * CashFlow cashFlow = new CashFlow(series, tradingRecord); for( int i=0;
+					 * i<cashFlow.getSize()-1; i++) { System.out.println("Cashflow on step #: " + i
+					 * + " = " + cashFlow.getValue(i)); }
+					 */
+
+					// Getting the profitable trades ratio
+					AnalysisCriterion profitTradesRatio = new AverageProfitableTradesCriterion();
+					System.out
+							.println("Profitable trades ratio: " + profitTradesRatio.calculate(series, tradingRecord));
+					// Getting the reward-risk ratio
+					AnalysisCriterion rewardRiskRatio = new RewardRiskRatioCriterion();
+					System.out.println("Reward-risk ratio: " + rewardRiskRatio.calculate(series, tradingRecord));
+
+					// Total profit of our strategy
+					// vs total profit of a buy-and-hold strategy
+					AnalysisCriterion vsBuyAndHold = new VersusBuyAndHoldCriterion(new TotalProfitCriterion());
+					System.out.println(
+							"Our profit vs buy-and-hold profit: " + vsBuyAndHold.calculate(series, tradingRecord));
+				}
+			}
+
+		});
+	}
+
 	private static TimeSeries initializeMovingTimeSeries(String symbol) {
 
 		BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance();
@@ -77,7 +307,7 @@ public class TradingBotOnMovingTimeSeries {
 		// Check server time
 		tradeSessionStartTime = client.getServerTime();
 
-		// List<AggTrade> aggTrades = client.getAggTrades(symbol.toUpperCase());
+		List<AggTrade> aggTrades = client.getAggTrades(symbol.toUpperCase());
 
 		CandlestickInterval interval = CandlestickInterval.ONE_MINUTE;
 		List<Candlestick> candlestickBars = client.getCandlestickBars(symbol.toUpperCase(), interval);
@@ -139,10 +369,11 @@ public class TradingBotOnMovingTimeSeries {
 		// SMAIndicator sma = new SMAIndicator(new ClosePriceIndicator(series), 10);
 
 		// Getting a EMA (e.g. over the 20 last ticks)
-		EMAIndicator ema = new EMAIndicator(new ClosePriceIndicator(series), 20);
-
+		EMAIndicator ema = new EMAIndicator(closePrice, 20);
+		RSIIndicator rsi = new RSIIndicator(closePrice, 14);
 		StochasticRSIIndicator srsi = new StochasticRSIIndicator(series, 14);
-		Decimal srsiThreshold = Decimal.valueOf(0.6);
+		Decimal srsiThresholdHigh = Decimal.valueOf(0.5);
+		Decimal srsiThresholdLow = Decimal.valueOf(0.25);
 
 		// Using Keltner Channels as the trend following indicator
 		KeltnerChannelMiddleIndicator km = new KeltnerChannelMiddleIndicator(new ClosePriceIndicator(series), 20);
@@ -159,9 +390,13 @@ public class TradingBotOnMovingTimeSeries {
 
 		RenkoIndicator renko = new RenkoIndicator(series);
 
+		MACDIndicator macd = new MACDIndicator(closePrice, 12, 26);
+		EMAIndicator emaSignal = new EMAIndicator(macd, 9);
+		MACDOscillator macdOscillator = new MACDOscillator(closePrice, 12, 26, 9);
+
 		// Getting the close price of the ticks
 		int index = series.getEndIndex();
-		Decimal lastClosePrice = series.getTick(index).getClosePrice();
+		// Decimal lastClosePrice = series.getTick(index).getClosePrice();
 		// within an indicator:
 		// System.out.println("First close price: " + lastClosePrice.toDouble());
 
@@ -169,32 +404,49 @@ public class TradingBotOnMovingTimeSeries {
 		// System.out.println(lastClosePrice.isEqual(closePrice.getValue(index))); //
 		// equal to firstClosePrice
 
-		String bwdynamic = (bandwidth.getValue(index).toDouble() < bandwidth.getValue(index - 1).toDouble()) ? " ↓ "
-				: " ↑ ";
-		System.out.println("K-channels: (L): " + kl.getValue(index).toDouble() + " (M): "
-				+ km.getValue(index).toDouble() + " (U): " + ku.getValue(index).toDouble());
-		System.out.println("B-channels: (L): " + bblSMA.getValue(index).toDouble() + " (M): "
-				+ bbmSMA.getValue(index).toDouble() + " (U): " + bbuSMA.getValue(index).toDouble() + " B-bandwith: ("
-				+ bwdynamic + ") " + bandwidth.getValue(index).toDouble());
+		/*
+		 * String bwdynamic = (bandwidth.getValue(index).toDouble() <
+		 * bandwidth.getValue(index - 1).toDouble()) ? " ↓ " : " ↑ ";
+		 * System.out.println("K-channels: (L): " + kl.getValue(index).toDouble() +
+		 * " (M): " + km.getValue(index).toDouble() + " (U): " +
+		 * ku.getValue(index).toDouble()); System.out.println("B-channels: (L): " +
+		 * bblSMA.getValue(index).toDouble() + " (M): " +
+		 * bbmSMA.getValue(index).toDouble() + " (U): " +
+		 * bbuSMA.getValue(index).toDouble() + " B-bandwith: (" + bwdynamic + ") " +
+		 * bandwidth.getValue(index).toDouble());
+		 */
+
 		// Ok, now let's building our trading rules!
 
-		// Buying rules
+		/**
+		 * Buying rules
+		 * 
+		 */
 		// We want to buy:
 		// - if the 20-ticks EMA crosses over 20-ticks Keltner's lower indicator
-		// - if the 12-ticks SMA crosses over the low bollinger's channel
-		// - consider renko + StochRSI > 0.6
-		// - or if the price goes below a defined price (e.g 0.0040 BTC)
+		// (obsolete)- if the 12-ticks SMA crosses over the low bollinger's channel
+		// - consider renko + StochRSI > 0.5
+		// (obsolete)- or if the price goes below a defined price (e.g 0.0040 BTC)
 
-		Rule buyingRule = (new CrossedUpIndicatorRule(ema, kl).or(new IsEqualRule(renko, Decimal.TWO)) // trend was
-																										// changed to
-																										// downwards
-				.or(new IsEqualRule(renko, Decimal.THREE))// still downwards trend
-				.or(new CrossedUpIndicatorRule(closePrice, bblSMA))
-		// .or(new CrossedDownIndicatorRule(closePrice, Decimal.valueOf("0.0040"))) -
-		// KISS
-		).and(new OverIndicatorRule(srsi, srsiThreshold));
+		Rule buyingRule = new CrossedUpIndicatorRule(macd, emaSignal)
+				// .or(new IsFallingRule(macd, 3))
+				// .and(new IsLowestRule(macd, 3))
+				.or(new CrossedUpIndicatorRule(closePrice, kl)) // keltner's watchdog
+				.or(new CrossedUpIndicatorRule(closePrice, bblSMA))// bollinger's watchdog
+				.or(new OverIndicatorRule(srsi, srsiThresholdLow)).or(new UnderIndicatorRule(rsi, Decimal.valueOf(20)));
 
-		// Selling rules
+		// trend was changed to downwards OR still upwards trend
+		// buyingRule = buyingRule.and(new OverIndicatorRule(macdOscillator,
+		// Decimal.ZERO)).and(new IsFallingRule(macdOscillator, 3))
+
+		// .or(new IsEqualRule(renko, Decimal.ZERO.minus(Decimal.TWO)).or(new
+		// IsEqualRule(renko, Decimal.THREE)))
+
+		/**
+		 * Selling rules
+		 * 
+		 */
+
 		// We want to sell:
 		// - if the 20-ticks EMA crosses under 20-ticks Keltner's lower indicator
 		// - if the 12-ticks SMA crosses under the upper bollinger's channel
@@ -202,12 +454,24 @@ public class TradingBotOnMovingTimeSeries {
 		// - or if if the price looses more than 5%
 		// - or if the price earns more than 369%
 
-		Rule sellingRule = (new CrossedDownIndicatorRule(ema, ku).or(new CrossedDownIndicatorRule(closePrice, bbuSMA))
-				.or(new IsEqualRule(renko, Decimal.ZERO.minus(Decimal.TWO)))) // trend was changed to upwards
-						.or(new IsEqualRule(renko, Decimal.ZERO.minus(Decimal.THREE)))// still upwards trend
-						.and(new OverIndicatorRule(srsi, srsiThreshold))
-						// .or(new StopLossRule(closePrice, Decimal.valueOf("0.0036"))) - KISS
-						.or(new StopGainRule(closePrice, Decimal.valueOf("369")));
+		//
+		Rule sellingRule = new CrossedDownIndicatorRule(macd, emaSignal)
+				.or(new CrossedDownIndicatorRule(bbuSMA, closePrice)) // bollinger's watchdog
+				.or(new CrossedDownIndicatorRule(ema, ku))// keltner's watchdog
+				.or(new OverIndicatorRule(rsi, Decimal.valueOf(80)).or(new OverIndicatorRule(srsi, srsiThresholdHigh)))
+		// .or(new CrossedDownIndicatorRule(bbuSMA, closePrice)) // bollinger's watchdog
+		// .or(new CrossedDownIndicatorRule(ema, ku)// keltner's watchdog
+		// .or(new IsHighestRule(srsi, 6)) // within 6 last ticks
+		// .or(new OverIndicatorRule(srsi, srsiThresholdHigh))
+		// .or(new StopLossRule(closePrice, Decimal.valueOf("0.0036")))
+		// .or(new StopGainRule(closePrice, Decimal.valueOf("369"))))
+		;
+
+		// trend was changed to downwards OR still downwards trend
+		// sellingRule = sellingRule.and(new UnderIndicatorRule(macdOscillator,
+		// Decimal.ZERO)).and(new IsRisingRule(macdOscillator, 3))
+		// .or(new IsEqualRule(renko, Decimal.TWO).or(new IsEqualRule(renko,
+		// Decimal.ZERO.minus(Decimal.THREE))))
 
 		// Running our juicy trading strategy...
 		Strategy buySellSignals = new BaseStrategy(buyingRule, sellingRule);
@@ -408,7 +672,13 @@ public class TradingBotOnMovingTimeSeries {
 
 		// Building the trading strategy
 		/////////////////////////////// Strategy strategy = buildStrategy(series);
-		Strategy strategy = buildStrategyTrendFollowing(series); // buildSuperPuperStrategy(series);
+
+		/**
+		 * Strategy strategy = buildStrategyTrendFollowing(series); //
+		 * buildSuperPuperStrategy(series);
+		 */
+
+		Strategy strategy = buildStrategy(series);
 
 		// Initializing the trading history
 		TradingRecord tradingRecord = new BaseTradingRecord();
@@ -487,6 +757,7 @@ public class TradingBotOnMovingTimeSeries {
 				System.out.println("Strategy should ENTER on " + (endIndex + 1));
 				boolean entered = tradingRecord.enter(endIndex, newTick.getClosePrice(), amountToBePurchased);
 				if (entered) {
+					java.awt.Toolkit.getDefaultToolkit().beep();
 					Order entry = tradingRecord.getLastEntry();
 
 					walletAmount = walletAmount.minus(
@@ -504,8 +775,10 @@ public class TradingBotOnMovingTimeSeries {
 				System.out.println("Strategy should EXIT on " + (endIndex + 1));
 				boolean exited = tradingRecord.exit(endIndex, newTick.getClosePrice(), amountToBeSold);
 				if (exited) {
-					Order exit = tradingRecord.getLastExit();
+					java.awt.Toolkit.getDefaultToolkit().beep();
+					java.awt.Toolkit.getDefaultToolkit().beep();
 
+					Order exit = tradingRecord.getLastExit();
 					walletAmount = walletAmount.plus(
 							Decimal.valueOf((1 - fee) * exit.getPrice().toDouble() * exit.getAmount().toDouble()));
 					walletQuantity = walletQuantity.plus(Decimal.valueOf((1 - fee) * exit.getAmount().toDouble()));
@@ -541,12 +814,31 @@ public class TradingBotOnMovingTimeSeries {
 		});
 	}
 
+	public static void log(AggTrade updateAggTrade) {
+
+		AggTradeDumpDb logger = new AggTradeDumpDb(symbol.toUpperCase());
+		logger.setAggtrade(updateAggTrade);
+		// synchronous call
+		// logger.run();
+		// asynchronous call
+		Thread thread = new Thread(logger);
+		thread.start();
+
+		new DepthCacheExample(symbol);
+	}
+
 	public static void main(String[] args) throws InterruptedException {
 
 		System.out.println("********************** Initialization **********************");
 
-		SqlTradesLoader.setTicksPerSecond(1);
-		run("QTUMBTC", 1000);
+		/*
+		 * SqlTradesLoader.setTicksPerSecond(1); run("QTUMBTC", 1000);
+		 */
+		// String instrument = "QTUMBTC";
+		String instrument = "XRPBTC";
+		TradingBotOnMovingTimeSeries bot = new TradingBotOnMovingTimeSeries();
+		bot.initializeAggTradesCache(instrument);
+		bot.startAggTradesEventStreaming(instrument, 5000);// max number of ticks
 
 		// backtest(60*60*12);
 	}

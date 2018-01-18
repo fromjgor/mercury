@@ -18,14 +18,20 @@ public class BinanceApiWebSocketListener<T> extends WebSocketListener {
 
   private Class<T> eventClass;
 
+  private ObjectMapper mapper;
+
   public BinanceApiWebSocketListener(BinanceApiCallback<T> callback, Class<T> eventClass) {
+    this(callback, eventClass, new ObjectMapper());
+  }
+
+  public BinanceApiWebSocketListener(BinanceApiCallback<T> callback, Class<T> eventClass, ObjectMapper mapper) {
     this.callback = callback;
     this.eventClass = eventClass;
+    this.mapper = mapper;
   }
 
   @Override
   public void onMessage(WebSocket webSocket, String text) {
-    ObjectMapper mapper = new ObjectMapper();
     try {
       T event = mapper.readValue(text, eventClass);
       callback.onResponse(event);
@@ -36,7 +42,6 @@ public class BinanceApiWebSocketListener<T> extends WebSocketListener {
 
   @Override
   public void onFailure(WebSocket webSocket, Throwable t, Response response) {
-//@to be extended in case of java.net.SocketException
     throw new BinanceApiException(t);
   }
 }

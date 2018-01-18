@@ -3,6 +3,7 @@ package com.binance.api.client.mercury;
 import org.ta4j.core.Decimal;
 import org.ta4j.core.TimeSeries;
 import org.ta4j.core.indicators.*;
+import com.binance.api.client.mercury.RenkoSignal;
 
 /**
  * Renko indicator.
@@ -19,6 +20,7 @@ public class RenkoIndicator extends CachedIndicator<Decimal> {
 	 */
 	private static final long serialVersionUID = 1L;
 	private final TimeSeries series;
+	private RenkoSignal renkoSignal;
 
 	/** Body height */
 	// private final Indicator<Decimal> bodyHeightInd;
@@ -74,6 +76,7 @@ public class RenkoIndicator extends CachedIndicator<Decimal> {
 				&& series.getTick(index - 3).getClosePrice().isLessThan(series.getTick(index - 2).getClosePrice())
 				&& ((series.getTick(index - 3).getTrades() > 1) && (series.getTick(index - 2).getTrades() > 1))) {
 			// no trend change at upwards trend - next green renko brick can be made
+			renkoSignal = RenkoSignal.STILL_UPWARDS;
 			return Decimal.THREE;
 		} else if (series.getTick(index - 1).getClosePrice().isGreaterThan(series.getTick(index).getClosePrice())
 				&& ((series.getTick(index - 1).getTrades() > 1) && (series.getTick(index).getTrades() > 1))
@@ -82,6 +85,7 @@ public class RenkoIndicator extends CachedIndicator<Decimal> {
 				&& series.getTick(index - 3).getClosePrice().isGreaterThan(series.getTick(index - 2).getClosePrice())
 				&& ((series.getTick(index - 3).getTrades() > 1) && (series.getTick(index - 2).getTrades() > 1))) {
 			// no trend change at downward trend - next red renko brick can be made
+			renkoSignal = RenkoSignal.STILL_DOWNWARDS;
 			return Decimal.ZERO.minus(Decimal.THREE);
 		} else if (series.getTick(index - 3).getClosePrice().isLessThan(series.getTick(index - 2).getClosePrice())
 				&& ((series.getTick(index - 3).getTrades() > 1) && (series.getTick(index - 2).getTrades() > 1))
@@ -90,6 +94,7 @@ public class RenkoIndicator extends CachedIndicator<Decimal> {
 				&& series.getTick(index - 1).getClosePrice().isGreaterThan(series.getTick(index).getClosePrice())
 				&& ((series.getTick(index - 1).getTrades() > 1) && (series.getTick(index).getTrades() > 1))) {
 			// upwards trend seems to be changed to a downward: one up - two down
+			renkoSignal = RenkoSignal.UPWARDS_DOWNWARDS;
 			return Decimal.ZERO.minus(Decimal.TWO);
 		} else if (series.getTick(index - 3).getClosePrice().isGreaterThan(series.getTick(index - 2).getClosePrice())
 				&& ((series.getTick(index - 3).getTrades() > 1) && (series.getTick(index - 2).getTrades() > 1))
@@ -98,8 +103,18 @@ public class RenkoIndicator extends CachedIndicator<Decimal> {
 				&& series.getTick(index - 1).getClosePrice().isLessThan(series.getTick(index).getClosePrice())
 				&& ((series.getTick(index - 1).getTrades() > 1) && (series.getTick(index).getTrades() > 1))) {
 			// downwards trend seems to be changed to a upwards : one down - two up
+			renkoSignal = RenkoSignal.DOWNWARDS_UPWARDS;
 			return Decimal.TWO;
 		} else // Nominal case neutral
-			return Decimal.ONE;
+			renkoSignal = RenkoSignal.SIDEWARDS;
+		return Decimal.ONE;
+	}
+
+	public RenkoSignal getRenkoSignal() {
+		return renkoSignal;
+	}
+
+	public void setRenkoSignal(RenkoSignal renkoSignal) {
+		this.renkoSignal = renkoSignal;
 	}
 }

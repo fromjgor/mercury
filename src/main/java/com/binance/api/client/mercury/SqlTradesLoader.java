@@ -101,7 +101,7 @@ public class SqlTradesLoader {
 		List<Tick> emptyTicks = new ArrayList<>();
 
 		// Duration tickDuration = Duration.ofSeconds(duration);
-		Duration tickDuration = Duration.ofMillis(duration);
+		Duration tickDuration = Duration.ofSeconds(duration);
 		ZonedDateTime tickEndTime = beginTime;
 		do {
 			tickEndTime = tickEndTime.plus(tickDuration);
@@ -119,11 +119,7 @@ public class SqlTradesLoader {
 	 */
 	public static void removeEmptyTicks(List<Tick> ticks) {
 		for (int i = ticks.size() - 1; i >= 0; i--) {
-			if (ticks.get(i).getTrades() == 0 /*
-												 * || ticks.get(i).getClosePrice() == Decimal.valueOf(0) ||
-												 * ticks.get(i).getVolume() == Decimal.valueOf(0)
-												 */
-			) {
+			if (ticks.get(i).getTrades() == 0) {
 				ticks.remove(i);
 			}
 		}
