@@ -834,8 +834,8 @@ public class TradingBotOnMovingTimeSeries {
 		/*
 		 * SqlTradesLoader.setTicksPerSecond(1); run("QTUMBTC", 1000);
 		 */
-		// String instrument = "QTUMBTC";
-		String instrument = "XRPBTC";
+		String instrument = "QTUMBTC";
+		// String instrument = "XRPBTC";
 		TradingBotOnMovingTimeSeries bot = new TradingBotOnMovingTimeSeries();
 		bot.initializeAggTradesCache(instrument);
 		bot.startAggTradesEventStreaming(instrument, 5000);// max number of ticks
