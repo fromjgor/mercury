@@ -59,30 +59,28 @@ public class AggTradesCacheExample {
 	 * arrives.
 	 */
 	private long tradeSessionStartTime;
-	
+
 	private Map<Long, AggTrade> aggTradesCache;
 	/**
-	 * Key is the minimal time stamp of the tick, and the value contains the aggregated trades
-	 * data, that is automatically collected whenever a new agg data stream event
-	 * arrives.
+	 * Key is the minimal time stamp of the tick, and the value contains the
+	 * aggregated trades data, that is automatically collected whenever a new agg
+	 * data stream event arrives.
 	 */
-	
-	//private Map<Long, List<AggTrade>> aggTradeTicksCashe;
-	//private MercuryRealTimeChart realTimeChart = null;   
-	
+
+	// private Map<Long, List<AggTrade>> aggTradeTicksCashe;
+	// private MercuryRealTimeChart realTimeChart = null;
+
 	/**
-	 * Tick duration is 1000 millisecond 
+	 * Tick duration is 1000 millisecond
 	 */
 	private static final Duration tickDuration = Duration.ofMillis(500);
-	
-	  /*private List<Double> getRandomData(int numPoints) {
 
-		    List<Double> data = new CopyOnWriteArrayList<Double>();
-		    for (int i = 0; i < numPoints; i++) {
-		      data.add(Math.random() * 100);
-		    }
-		    return data;
-		  }*/
+	/*
+	 * private List<Double> getRandomData(int numPoints) {
+	 * 
+	 * List<Double> data = new CopyOnWriteArrayList<Double>(); for (int i = 0; i <
+	 * numPoints; i++) { data.add(Math.random() * 100); } return data; }
+	 */
 
 	/**
 	 * Builds a list of empty ticks.
@@ -120,27 +118,28 @@ public class AggTradesCacheExample {
 		}
 	}
 
-    /**
-     * @return a time series from Binance exchange trades
-     */
+	/**
+	 * @return a time series from Binance exchange trades
+	 */
 	public TimeSeries loadBinanceSeries(String symbol, List<AggTrade> aggTrades) {
 		List<Tick> ticks = null;
 
 		ZonedDateTime beginTime = null;
 		ZonedDateTime endTime = null;
 
-		/*this.aggTradesCache.size();
-		
-		beginTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(rs.getLong("beginTimestamp")),
-				ZoneId.systemDefault());
-		endTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(rs.getLong("endTimestamp")),
-				ZoneId.systemDefault());
-
-		*/
-		return new BaseTimeSeries( symbol, ticks );
+		/*
+		 * this.aggTradesCache.size();
+		 * 
+		 * beginTime =
+		 * ZonedDateTime.ofInstant(Instant.ofEpochMilli(rs.getLong("beginTimestamp")),
+		 * ZoneId.systemDefault()); endTime =
+		 * ZonedDateTime.ofInstant(Instant.ofEpochMilli(rs.getLong("endTimestamp")),
+		 * ZoneId.systemDefault());
+		 * 
+		 */
+		return new BaseTimeSeries(symbol, ticks);
 	}
 
-	
 	public AggTradesCacheExample(String symbol) {
 		initializeAggTradesCache(symbol);
 		startAggTradesEventStreaming(symbol);
@@ -153,67 +152,67 @@ public class AggTradesCacheExample {
 
 		BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance();
 		BinanceApiRestClient client = factory.newRestClient();
-		List<AggTrade> aggTrades = client.getAggTrades(symbol.toUpperCase());	
-		this.aggTradesCache = new HashMap<>();		
-		
-		
-		/*	List<Tick> ticks = null;
-		*	Long tickIndex = 0L;
-		*	List<AggTrade> listAggTrade = new CopyOnWriteArrayList<AggTrade>();
-		*	this.aggTradeTicksCashe = new HashMap<Long, List<AggTrade>>(); 
-		*		
-		*
-		*	ZonedDateTime tickStartTime = ZonedDateTime.now(ZoneId.systemDefault());
-		*	ZonedDateTime tickEndTime = ZonedDateTime.now(ZoneId.systemDefault());
-		*/
+		List<AggTrade> aggTrades = client.getAggTrades(symbol.toUpperCase());
+		this.aggTradesCache = new HashMap<>();
 
-	    // Test connectivity
-	    client.ping();
+		/*
+		 * List<Tick> ticks = null; Long tickIndex = 0L; List<AggTrade> listAggTrade =
+		 * new CopyOnWriteArrayList<AggTrade>(); this.aggTradeTicksCashe = new
+		 * HashMap<Long, List<AggTrade>>();
+		 * 
+		 *
+		 * ZonedDateTime tickStartTime = ZonedDateTime.now(ZoneId.systemDefault());
+		 * ZonedDateTime tickEndTime = ZonedDateTime.now(ZoneId.systemDefault());
+		 */
 
-	    // Check server time
-	    tradeSessionStartTime = client.getServerTime();
+		// Check server time
+		tradeSessionStartTime = client.getServerTime();
 
 		List<Integer> xData = new CopyOnWriteArrayList<Integer>();
 		List<Double> yData = new CopyOnWriteArrayList<Double>();
 		List<Double> errorBars = new CopyOnWriteArrayList<Double>();
-        int counter = 0;
-        long startTimestamp = tradeSessionStartTime;
-        long endTimestamp = tradeSessionStartTime;
-        for (AggTrade aggTrade : aggTrades) {
-        	Long currentTimestamp = aggTrade.getTradeTime();
-        	if ( currentTimestamp < startTimestamp ) startTimestamp = currentTimestamp;
-        	if ( currentTimestamp > endTimestamp ) 	 endTimestamp = currentTimestamp;
-        }
-        
-		for (AggTrade aggTrade : aggTrades) {
-			
-			/*ZonedDateTime tradeTimestamp = ZonedDateTime.ofInstant(Instant.ofEpochMilli(aggTrade.getTradeTime()),
-																						ZoneId.systemDefault());
-			if ( tradeTimestamp.isBefore(tickStartTime)) tickStartTime = tradeTimestamp;
-			if (!tradeTimestamp.isBefore(tickEndTime))   tickEndTime   = tradeTimestamp;  			
 
-			if (!tradeTimestamp.isBefore(tickEndTime)) 
-			{	// new tick
-				if ( (tickIndex >0) && (listAggTrade.size() > 0)) aggTradeTicksCashe.put( tickIndex, listAggTrade );
-				tickEndTime = tradeTimestamp.plus(tickDuration);
-				listAggTrade = new CopyOnWriteArrayList<AggTrade>();				
-				tickIndex++;			
-			}
-			listAggTrade.add(aggTrade);*/
-			
+		long startTimestamp = tradeSessionStartTime;
+		long endTimestamp = tradeSessionStartTime;
+		for (AggTrade aggTrade : aggTrades) {
+			Long currentTimestamp = aggTrade.getTradeTime();
+			if (currentTimestamp < startTimestamp)
+				startTimestamp = currentTimestamp;
+			if (currentTimestamp > endTimestamp)
+				endTimestamp = currentTimestamp;
+		}
+
+		for (AggTrade aggTrade : aggTrades) {
+
+			/*
+			 * ZonedDateTime tradeTimestamp =
+			 * ZonedDateTime.ofInstant(Instant.ofEpochMilli(aggTrade.getTradeTime()),
+			 * ZoneId.systemDefault()); if ( tradeTimestamp.isBefore(tickStartTime))
+			 * tickStartTime = tradeTimestamp; if (!tradeTimestamp.isBefore(tickEndTime))
+			 * tickEndTime = tradeTimestamp;
+			 * 
+			 * if (!tradeTimestamp.isBefore(tickEndTime)) { // new tick if ( (tickIndex >0)
+			 * && (listAggTrade.size() > 0)) aggTradeTicksCashe.put( tickIndex, listAggTrade
+			 * ); tickEndTime = tradeTimestamp.plus(tickDuration); listAggTrade = new
+			 * CopyOnWriteArrayList<AggTrade>(); tickIndex++; } listAggTrade.add(aggTrade);
+			 */
+
 			Long currentTimestamp = aggTrade.getTradeTime();
 			Double price = new Double(aggTrade.getPrice());
 			Double quantity = new Double(aggTrade.getQuantity());
-			Double amount = price * quantity;			
-			xData.add( (int) (long) (50 * (currentTimestamp - startTimestamp)/(endTimestamp - startTimestamp)));
+			Double amount = price * quantity;
+			xData.add((int) (50 * (currentTimestamp - startTimestamp) / (endTimestamp - startTimestamp)));
 			yData.add(amount);
 			errorBars.add(0.0);
 			aggTradesCache.put(aggTrade.getAggregatedTradeId(), aggTrade);
 		}
-		
-		/*realTimeChart = new MercuryRealTimeChart(xData,yData, errorBars, response -> { 
-			
-		} );*/
+
+		/*
+		 * realTimeChart = new MercuryRealTimeChart(xData,yData, errorBars, response ->
+		 * {
+		 * 
+		 * } );
+		 */
 	}
 
 	/**
@@ -223,7 +222,22 @@ public class AggTradesCacheExample {
 		BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance();
 		BinanceApiWebSocketClient client = factory.newWebSocketClient();
 
+		/*
+		 * static void startAggTradeEventListener(BinanceApiClientFactory factory,
+		 * String symbol, ExchangeApiCallback<AggTradeEvent> callback) {
+		 * BinanceApiWebSocketClient client = factory.newWebSocketClient();
+		 * client.onAggTradeEvent(symbol, (AggTradeEvent event) -> { if (event == null)
+		 * { startAggTradeEventListener(factory, symbol, callback); } else {
+		 * callback.onResponse(event); } }); }
+		 */
+
 		client.onAggTradeEvent(symbol.toLowerCase(), response -> {
+
+			if (response == null) {
+				startAggTradesEventStreaming(symbol);
+				return;
+			}
+
 			Long aggregatedTradeId = response.getAggregatedTradeId();
 			AggTrade updateAggTrade = aggTradesCache.get(aggregatedTradeId);
 			if (updateAggTrade == null) {
@@ -231,36 +245,32 @@ public class AggTradesCacheExample {
 				updateAggTrade = new AggTrade();
 			}
 
-							/*Duration tickDuration = Duration.ofSeconds(1);
-							Long tickIndex = new Long(this.aggTradeTicksCashe.size());
-							List<AggTrade> listAggTrade = null;    
-				
-							if (aggTradeTicksCashe.isEmpty()) {
-								listAggTrade = new CopyOnWriteArrayList<AggTrade>();
-								aggTradeTicksCashe.put( tickIndex, listAggTrade );
-							} else {
-								listAggTrade = this.aggTradeTicksCashe.get(tickIndex);
-							}
-							
-							ZonedDateTime tradeTimestamp = ZonedDateTime.ofInstant(Instant.ofEpochMilli(updateAggTrade.getTradeTime()),
-									ZoneId.systemDefault());
-							ZonedDateTime tickEndTime = tradeTimestamp.plus(tickDuration);
-				
-							if (!tradeTimestamp.isBefore(tickEndTime)) 
-							{	// new tick
-								++tickIndex;
-								listAggTrade = new CopyOnWriteArrayList<AggTrade>();
-								aggTradeTicksCashe.put( tickIndex, listAggTrade );					
-							} 
-							// Store the updated agg trade in the current tick cache
-							listAggTrade.add(updateAggTrade);*/
-							
-							/*List<Tick> ticks = null;
-							Long tickIndex = 0L;
-							List<AggTrade> listAggTrade = new CopyOnWriteArrayList<AggTrade>();
-							this.aggTradeTicksCashe = new HashMap<Long, List<AggTrade>>();*/ 
-			
-					
+			/*
+			 * Duration tickDuration = Duration.ofSeconds(1); Long tickIndex = new
+			 * Long(this.aggTradeTicksCashe.size()); List<AggTrade> listAggTrade = null;
+			 * 
+			 * if (aggTradeTicksCashe.isEmpty()) { listAggTrade = new
+			 * CopyOnWriteArrayList<AggTrade>(); aggTradeTicksCashe.put( tickIndex,
+			 * listAggTrade ); } else { listAggTrade =
+			 * this.aggTradeTicksCashe.get(tickIndex); }
+			 * 
+			 * ZonedDateTime tradeTimestamp =
+			 * ZonedDateTime.ofInstant(Instant.ofEpochMilli(updateAggTrade.getTradeTime()),
+			 * ZoneId.systemDefault()); ZonedDateTime tickEndTime =
+			 * tradeTimestamp.plus(tickDuration);
+			 * 
+			 * if (!tradeTimestamp.isBefore(tickEndTime)) { // new tick ++tickIndex;
+			 * listAggTrade = new CopyOnWriteArrayList<AggTrade>(); aggTradeTicksCashe.put(
+			 * tickIndex, listAggTrade ); } // Store the updated agg trade in the current
+			 * tick cache listAggTrade.add(updateAggTrade);
+			 */
+
+			/*
+			 * List<Tick> ticks = null; Long tickIndex = 0L; List<AggTrade> listAggTrade =
+			 * new CopyOnWriteArrayList<AggTrade>(); this.aggTradeTicksCashe = new
+			 * HashMap<Long, List<AggTrade>>();
+			 */
+
 			updateAggTrade.setTradeTime(response.getEventTime());
 			updateAggTrade.setAggregatedTradeId(aggregatedTradeId);
 			updateAggTrade.setPrice(response.getPrice());
@@ -271,87 +281,67 @@ public class AggTradesCacheExample {
 
 			// Store the updated agg trade in the cache
 			aggTradesCache.put(aggregatedTradeId, updateAggTrade);
-			
-			
-/*
- * Build ticks and Series 
- * */
-			
-			Long trendAnalysisTimeFrame = 5L;  // perform a trend analysis using last 5 seconds time frame
-			
-			ZonedDateTime tickEndTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(response.getEventTime()), //lastTradeEventTime
-					ZoneId.systemDefault());
-			ZonedDateTime tickStartTime = tickEndTime.minusSeconds(trendAnalysisTimeFrame);   
-			/*	
-			 * ZonedDateTime tickStartTime = ZonedDateTime.now(ZoneId.systemDefault());
-			 * ZonedDateTime tickEndTime = tickStartTime;
-			 * Iterator<Long> aggTradesCacheIterator = aggTradesCache.keySet().iterator();
-			 * while (aggTradesCacheIterator.hasNext()) {
-				AggTrade aggTrade = aggTradesCache.get(aggTradesCacheIterator.next());
-				ZonedDateTime tradeTimestamp = ZonedDateTime.ofInstant(Instant.ofEpochMilli(aggTrade.getTradeTime()),ZoneId.systemDefault());
-				if ( tradeTimestamp.isBefore(tickStartTime)) tickStartTime = tradeTimestamp;
-				if ( tradeTimestamp.isAfter(tickEndTime))    tickEndTime   = tradeTimestamp;
-			}
-			*/
-			
-/*			
-			// Building the empty ticks 
-			List<Tick> ticks = buildEmptyTicks(tickStartTime, tickEndTime);
-			
-			Iterator<Long> aggTradesCacheIterator = aggTradesCache.keySet().iterator();
-			while (aggTradesCacheIterator.hasNext()) {
-				AggTrade aggTrade = aggTradesCache.get(aggTradesCacheIterator.next());
-				ZonedDateTime tradeTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(aggTrade.getTradeTime()),
-						ZoneId.systemDefault());
-				
-				if ( tradeTime.isAfter(tickStartTime) && tradeTime.isBefore(tickEndTime)) {
-					//	Filling the ticks with trades
-					for (Tick tick : ticks) {
-						if (tick.inPeriod(tradeTime)) {
-							Double price = new Double(aggTrade.getPrice());
-							Double quantity = new Double(aggTrade.getQuantity());
-							Double amount = price * quantity;
-							tick.addTrade( amount, price);
-						}
-					}					
-				}
-			}
-			// Removing still empty ticks
-			removeEmptyTicks(ticks);
-			
-			// Build time series
-			TimeSeries series = new BaseTimeSeries(symbol, ticks);
-*/			
-			
-/*
-			if( realTimeChart != null ) {
-				List<Integer> xData = new CopyOnWriteArrayList<Integer>();
-				List<Double> yData = new CopyOnWriteArrayList<Double>();
-				List<Double> errorBars = new CopyOnWriteArrayList<Double>();
-		        
-				for( int x: realTimeChart.getxData() ) {
-					xData.add(x);
-				}
-				for( double y: realTimeChart.getyData() ) {
-					yData.add(y);
-				}
-				for( double e: realTimeChart.getErrorBars() ) {
-					errorBars.add(e);
-				}
-				//xData.add(xData.size()+1);
-				xData.add(50);
-				xData.remove(0);
-				yData.add(new Double(response.getPrice()));
-				yData.remove(0);
-				//errorBars.add(0.0);
-				//errorBars.remove(0);
-				
-				realTimeChart.updateData(xData, yData, errorBars);				
-			}
-			*/
-			
+
 			/*
-			 *  Log AggTrade into database
+			 * Build ticks and Series
+			 */
+
+			Long trendAnalysisTimeFrame = 5L; // perform a trend analysis using last 5 seconds time frame
+
+			ZonedDateTime tickEndTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(response.getEventTime()), // lastTradeEventTime
+					ZoneId.systemDefault());
+			ZonedDateTime tickStartTime = tickEndTime.minusSeconds(trendAnalysisTimeFrame);
+			/*
+			 * ZonedDateTime tickStartTime = ZonedDateTime.now(ZoneId.systemDefault());
+			 * ZonedDateTime tickEndTime = tickStartTime; Iterator<Long>
+			 * aggTradesCacheIterator = aggTradesCache.keySet().iterator(); while
+			 * (aggTradesCacheIterator.hasNext()) { AggTrade aggTrade =
+			 * aggTradesCache.get(aggTradesCacheIterator.next()); ZonedDateTime
+			 * tradeTimestamp =
+			 * ZonedDateTime.ofInstant(Instant.ofEpochMilli(aggTrade.getTradeTime()),ZoneId.
+			 * systemDefault()); if ( tradeTimestamp.isBefore(tickStartTime)) tickStartTime
+			 * = tradeTimestamp; if ( tradeTimestamp.isAfter(tickEndTime)) tickEndTime =
+			 * tradeTimestamp; }
+			 */
+
+			/*
+			 * // Building the empty ticks List<Tick> ticks = buildEmptyTicks(tickStartTime,
+			 * tickEndTime);
+			 * 
+			 * Iterator<Long> aggTradesCacheIterator = aggTradesCache.keySet().iterator();
+			 * while (aggTradesCacheIterator.hasNext()) { AggTrade aggTrade =
+			 * aggTradesCache.get(aggTradesCacheIterator.next()); ZonedDateTime tradeTime =
+			 * ZonedDateTime.ofInstant(Instant.ofEpochMilli(aggTrade.getTradeTime()),
+			 * ZoneId.systemDefault());
+			 * 
+			 * if ( tradeTime.isAfter(tickStartTime) && tradeTime.isBefore(tickEndTime)) {
+			 * // Filling the ticks with trades for (Tick tick : ticks) { if
+			 * (tick.inPeriod(tradeTime)) { Double price = new Double(aggTrade.getPrice());
+			 * Double quantity = new Double(aggTrade.getQuantity()); Double amount = price *
+			 * quantity; tick.addTrade( amount, price); } } } } // Removing still empty
+			 * ticks removeEmptyTicks(ticks);
+			 * 
+			 * // Build time series TimeSeries series = new BaseTimeSeries(symbol, ticks);
+			 */
+
+			/*
+			 * if( realTimeChart != null ) { List<Integer> xData = new
+			 * CopyOnWriteArrayList<Integer>(); List<Double> yData = new
+			 * CopyOnWriteArrayList<Double>(); List<Double> errorBars = new
+			 * CopyOnWriteArrayList<Double>();
+			 * 
+			 * for( int x: realTimeChart.getxData() ) { xData.add(x); } for( double y:
+			 * realTimeChart.getyData() ) { yData.add(y); } for( double e:
+			 * realTimeChart.getErrorBars() ) { errorBars.add(e); }
+			 * //xData.add(xData.size()+1); xData.add(50); xData.remove(0); yData.add(new
+			 * Double(response.getPrice())); yData.remove(0); //errorBars.add(0.0);
+			 * //errorBars.remove(0);
+			 * 
+			 * realTimeChart.updateData(xData, yData, errorBars); }
+			 */
+
+			/*
+			 * Log AggTrade into database
 			 */
 			storeAggTradeCache(symbol, updateAggTrade);
 			// System.out.println(updateAggTrade);
@@ -364,7 +354,7 @@ public class AggTradesCacheExample {
 		logger.setAggtrade(updateAggTrade);
 
 		// synchronous call
-		//logger.run();
+		// logger.run();
 
 		// asynchronous call
 		Thread thread = new Thread(logger);
@@ -382,13 +372,44 @@ public class AggTradesCacheExample {
 	}
 
 	public static void main(String[] args) {
-		String[] myFavoritesBTC = new String[] {"QTUM","NEO", "IOTA", "FUEL", "ETH", "ETC", "XRP", "AION", "ICX","BNB"};
-		for (String  symbol : myFavoritesBTC) {
+
+		/**
+		 * Simulate a rest client activity to keep the connection by sending a ping
+		 * twice twice hour
+		 */
+		TimerTask connectivityTest = new TimerTask() {
+
+			@Override
+			public void run() {
+				BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance();
+				BinanceApiRestClient client = factory.newRestClient();
+
+				// Keep connection alive
+				client.ping();
+			}
+		};
+
+		Timer timer = new Timer();
+
+		long period = 1000 * 60 * 60 / 2;// milliseconds_per_second*seconds_per_minute*minutes_per_hour/2
+		long delay = period;
+
+		/**
+		 * twice per hour
+		 * 
+		 */
+		timer.scheduleAtFixedRate(connectivityTest, delay, period);
+
+		/************************************************************
+		 * do the needful
+		 ***********************************************************/
+		String[] myFavoritesBTC = new String[] { "QTUM", "NEO", "IOTA", "FUEL", "ETH", "ETC", "XRP", "AION", "ICX",
+				"BNB" };
+		for (String symbol : myFavoritesBTC) {
 			String pair = symbol + "BTC";
 			new AggTradesCacheExample(pair);
 			new DepthCacheExample(pair);
-		    new CandlesticksCacheExample(pair, CandlestickInterval.ONE_MINUTE);
+			new CandlesticksCacheExample(pair, CandlestickInterval.ONE_MINUTE);
 		}
-		
 	}
 }

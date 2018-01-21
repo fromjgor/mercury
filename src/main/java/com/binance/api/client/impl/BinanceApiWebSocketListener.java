@@ -14,34 +14,38 @@ import java.io.IOException;
  */
 public class BinanceApiWebSocketListener<T> extends WebSocketListener {
 
-  private BinanceApiCallback<T> callback;
+	private BinanceApiCallback<T> callback;
 
-  private Class<T> eventClass;
+	private Class<T> eventClass;
 
-  private ObjectMapper mapper;
+	private ObjectMapper mapper;
 
-  public BinanceApiWebSocketListener(BinanceApiCallback<T> callback, Class<T> eventClass) {
-    this(callback, eventClass, new ObjectMapper());
-  }
+	public BinanceApiWebSocketListener(BinanceApiCallback<T> callback, Class<T> eventClass) {
+		this(callback, eventClass, new ObjectMapper());
+	}
 
-  public BinanceApiWebSocketListener(BinanceApiCallback<T> callback, Class<T> eventClass, ObjectMapper mapper) {
-    this.callback = callback;
-    this.eventClass = eventClass;
-    this.mapper = mapper;
-  }
+	public BinanceApiWebSocketListener(BinanceApiCallback<T> callback, Class<T> eventClass, ObjectMapper mapper) {
+		this.callback = callback;
+		this.eventClass = eventClass;
+		this.mapper = mapper;
+	}
 
-  @Override
-  public void onMessage(WebSocket webSocket, String text) {
-    try {
-      T event = mapper.readValue(text, eventClass);
-      callback.onResponse(event);
-    } catch (IOException e) {
-      throw new BinanceApiException(e);
-    }
-  }
+	@Override
+	public void onMessage(WebSocket webSocket, String text) {
+		try {
+			T event = mapper.readValue(text, eventClass);
+			callback.onResponse(event);
+		} catch (IOException e) {
+			throw new BinanceApiException(e);
+		}
+	}
 
-  @Override
-  public void onFailure(WebSocket webSocket, Throwable t, Response response) {
-    throw new BinanceApiException(t);
-  }
+	@Override
+	public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+		/**
+		 * notify about the failure before raising exception
+		 */
+		callback.onResponse(null);
+		throw new BinanceApiException(t);
+	}
 }
