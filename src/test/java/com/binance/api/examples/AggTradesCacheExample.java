@@ -374,8 +374,8 @@ public class AggTradesCacheExample {
 	public static void main(String[] args) {
 
 		/**
-		 * Simulate a rest client activity to keep the connection by sending a ping
-		 * twice twice hour
+		 * Simulate a rest client activity to keep the connection alive by sending a
+		 * ping twice per hour
 		 */
 		TimerTask connectivityTest = new TimerTask() {
 

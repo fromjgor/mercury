@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.temporal.Temporal;
 import java.time.temporal.ChronoUnit;
 
+import org.slf4j.LoggerFactory;
 import org.ta4j.core.*;
 import org.ta4j.core.trading.rules.*;
 import org.ta4j.core.analysis.CashFlow;
@@ -12,19 +13,18 @@ import org.ta4j.core.analysis.criteria.RewardRiskRatioCriterion;
 import org.ta4j.core.analysis.criteria.TotalProfitCriterion;
 import org.ta4j.core.analysis.criteria.VersusBuyAndHoldCriterion;
 
-import org.ta4j.core.BaseTick;
-import org.ta4j.core.BaseTimeSeries;
-import org.ta4j.core.Decimal;
-import org.ta4j.core.Tick;
-import org.ta4j.core.TimeSeries;
-
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
+import org.ta4j.core.indicators.helpers.MedianPriceIndicator;
 import org.ta4j.core.indicators.EMAIndicator;
 import org.ta4j.core.indicators.MACDIndicator;
 import org.ta4j.core.indicators.SMAIndicator;
+import org.ta4j.core.indicators.StochasticOscillatorKIndicator;
 import org.ta4j.core.indicators.RSIIndicator;
 import org.ta4j.core.indicators.StochasticRSIIndicator;
+import org.ta4j.core.indicators.AwesomeOscillatorIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandWidthIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
@@ -39,6 +39,10 @@ import java.time.ZonedDateTime;
 
 import com.binance.api.client.mercury.*;
 
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.joran.JoranConfigurator;
+import ch.qos.logback.core.joran.spi.JoranException;
+
 import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.BinanceApiWebSocketClient;
@@ -49,6 +53,7 @@ import com.binance.api.client.domain.market.CandlestickInterval;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
+import java.net.URL;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -139,6 +144,30 @@ public class TradingBotOnMovingTimeSeries {
 		SqlTradesLoader.removeEmptyTicks(ticks);
 	}
 
+	private static final URL LOGBACK_CONF_FILE = TradingBotOnMovingTimeSeries.class.getClassLoader()
+			.getResource("logback-traces.xml");
+
+	/**
+	 * Loads the Logback configuration from a resource file. Only here to avoid
+	 * polluting other examples with logs. Could be replaced by a simple logback.xml
+	 * file in the resource folder.
+	 */
+	private static void loadLoggerConfiguration() {
+		LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
+		context.reset();
+
+		JoranConfigurator configurator = new JoranConfigurator();
+		configurator.setContext(context);
+		/**/
+		try {
+			configurator.doConfigure(LOGBACK_CONF_FILE);
+		} catch (JoranException je) {
+			Logger.getLogger(TradingBotOnMovingTimeSeries.class.getName()).log(Level.SEVERE,
+					"Unable to load Logback configuration", je);
+		}
+
+	}
+
 	/**
 	 */
 	private void startAggTradesEventStreaming(String symbol, int maxTickCount) {
@@ -149,7 +178,12 @@ public class TradingBotOnMovingTimeSeries {
 		series = new BaseTimeSeries(symbol, ticks);
 		series.setMaximumTickCount(maxTickCount);
 		// strategy = buildStrategy(series);
-		strategy = buildStrategyTrendFollowing(series);// buildStrategy(series);
+
+		/**
+		 * strategy = buildStrategyTrendFollowing(series);// buildStrategy(series);
+		 * 
+		 */
+		strategy = buildMovingMomentumStrategy(series);
 		System.out.println("************************************************************");
 
 		client.onAggTradeEvent(symbol.toLowerCase(), response -> {
@@ -210,7 +244,13 @@ public class TradingBotOnMovingTimeSeries {
 
 					series = new BaseTimeSeries(symbol, ticks);
 					series.setMaximumTickCount(maxTickCount);
-					strategy = buildStrategyTrendFollowing(series);// buildStrategy(series);
+
+					/**
+					 * strategy = buildStrategyTrendFollowing(series);// buildStrategy(series);
+					 * 
+					 */
+					strategy = buildMovingMomentumStrategy(series);
+
 					/*
 					 * if (nextick.inPeriod(updateAggTradeTime)) { if
 					 * (lastick.getEndTime().isBefore(nextick.getEndTime())) {
@@ -359,11 +399,54 @@ public class TradingBotOnMovingTimeSeries {
 	/** Close price of the last tick */
 	private static Decimal LAST_TICK_CLOSE_PRICE;
 
+	private static Map<Integer, Rule> sellingRulesCatalog = new HashMap<>();
+	private static Map<Integer, Integer> sellingRulesHistory = new HashMap<>();// Rule Number, Tick Index when the Rule
+																				// was satisfied
+
+	/**
+	 * @param series
+	 *            a time series
+	 * @return a moving momentum strategy
+	 */
+	public Strategy buildMovingMomentumStrategy(TimeSeries series) {
+		if (series == null) {
+			throw new IllegalArgumentException("Series cannot be null");
+		}
+
+		ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+
+		// The bias is bullish when the shorter-moving average moves above the longer
+		// moving average.
+		// The bias is bearish when the shorter-moving average moves below the longer
+		// moving average.
+		EMAIndicator shortEma = new EMAIndicator(closePrice, 9);
+		EMAIndicator longEma = new EMAIndicator(closePrice, 26);
+
+		StochasticOscillatorKIndicator stochasticOscillK = new StochasticOscillatorKIndicator(series, 14);
+
+		MACDIndicator macd = new MACDIndicator(closePrice, 9, 26);
+		EMAIndicator emaMacd = new EMAIndicator(macd, 18);
+
+		// Entry rule
+		Rule entryRule = new OverIndicatorRule(shortEma, longEma) // Trend
+				.and(new CrossedDownIndicatorRule(stochasticOscillK, Decimal.valueOf(20))) // Signal 1
+				.and(new OverIndicatorRule(macd, emaMacd)); // Signal 2
+
+		// Exit rule
+		Rule exitRule = new UnderIndicatorRule(shortEma, longEma) // Trend
+				.and(new CrossedUpIndicatorRule(stochasticOscillK, Decimal.valueOf(80))) // Signal 1
+				.and(new UnderIndicatorRule(macd, emaMacd)); // Signal 2
+
+		return new BaseStrategy(entryRule, exitRule);
+	}
+
 	private static Strategy buildStrategyTrendFollowing/* PlusMomentumIndicatorsPlusRenko */(TimeSeries series) {
 		if (series == null) {
 			throw new IllegalArgumentException("Series cannot be null");
 		}
 		ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+		AwesomeOscillatorIndicator awesome = new AwesomeOscillatorIndicator(new MedianPriceIndicator(series));
+		AwesomeIndicator ai = new AwesomeIndicator(awesome, series);// returns green or red bars
 
 		// Getting a SMA (e.g. over the 10 last ticks)
 		// SMAIndicator sma = new SMAIndicator(new ClosePriceIndicator(series), 10);
@@ -372,7 +455,7 @@ public class TradingBotOnMovingTimeSeries {
 		EMAIndicator ema = new EMAIndicator(closePrice, 20);
 		RSIIndicator rsi = new RSIIndicator(closePrice, 14);
 		StochasticRSIIndicator srsi = new StochasticRSIIndicator(series, 14);
-		Decimal srsiThresholdHigh = Decimal.valueOf(0.5);
+		Decimal srsiThresholdHigh = Decimal.valueOf(0.9);
 		Decimal srsiThresholdLow = Decimal.valueOf(0.25);
 
 		// Using Keltner Channels as the trend following indicator
@@ -393,6 +476,40 @@ public class TradingBotOnMovingTimeSeries {
 		MACDIndicator macd = new MACDIndicator(closePrice, 12, 26);
 		EMAIndicator emaSignal = new EMAIndicator(macd, 9);
 		MACDOscillator macdOscillator = new MACDOscillator(closePrice, 12, 26, 9);
+
+		// Getting a short (e.g.5-ticks) SMA
+		SMAIndicator shortSma = new SMAIndicator(closePrice, 5);
+
+		// Getting a longer SMA (e.g. over the 30 last ticks)
+		SMAIndicator longSma = new SMAIndicator(closePrice, 30);
+
+		// Ok, now let's building our trading rules!
+		// Buying rules
+		// We want to buy:
+		// - if the 5-ticks SMA crosses over 30-ticks SMA
+
+		// When awesome crosses above the Zero Line, short term momentum is now rising
+		// faster
+		// than the long term momentum
+		Rule buyingRuleBasic = (new CrossedUpIndicatorRule(awesome, Decimal.ZERO)
+		// .or(new CrossedUpIndicatorRule(shortSma, longSma))
+		// .or(new OverIndicatorRule(sma, closePrice))
+		).and(new IsRisingRule(closePrice, 3));
+
+		// Selling rules
+		// We want to sell:
+		// - if the 5-ticks SMA crosses under 30-ticks SMA
+
+		// When AO crosses below the Zero Line,
+		// short term momentum is now falling faster then the long term momentum.
+		// This can present a bearish selling opportunity.
+
+		Rule sellingRuleBasic = // new CrossedDownIndicatorRule(shortSma, longSma)
+				new CrossedDownIndicatorRule(awesome, Decimal.ZERO)
+		// .or(new CrossedUpIndicatorRule(shortSma, longSma))
+		// .or(new OverIndicatorRule(sma, closePrice))
+		// .or(new UnderIndicatorRule(sma, closePrice))
+		;
 
 		// Getting the close price of the ticks
 		int index = series.getEndIndex();
@@ -428,12 +545,16 @@ public class TradingBotOnMovingTimeSeries {
 		// - consider renko + StochRSI > 0.5
 		// (obsolete)- or if the price goes below a defined price (e.g 0.0040 BTC)
 
-		Rule buyingRule = new CrossedUpIndicatorRule(macd, emaSignal)
+		Rule buyingRule = buyingRuleBasic.or(
+				// buy only while rising prices
+				(new CrossedUpIndicatorRule(macd, emaSignal).or(new CrossedUpIndicatorRule(closePrice, kl)) // keltner's
+																											// watchdog
+						.or(new CrossedUpIndicatorRule(closePrice, bblSMA))// bollinger's watchdog
 				// .or(new IsFallingRule(macd, 3))
 				// .and(new IsLowestRule(macd, 3))
-				.or(new CrossedUpIndicatorRule(closePrice, kl)) // keltner's watchdog
-				.or(new CrossedUpIndicatorRule(closePrice, bblSMA))// bollinger's watchdog
-				.or(new OverIndicatorRule(srsi, srsiThresholdLow)).or(new UnderIndicatorRule(rsi, Decimal.valueOf(20)));
+				// .or(new OverIndicatorRule(srsi, srsiThresholdLow))
+				// .or(new UnderIndicatorRule(rsi, Decimal.valueOf(20)))
+				));
 
 		// trend was changed to downwards OR still upwards trend
 		// buyingRule = buyingRule.and(new OverIndicatorRule(macdOscillator,
@@ -455,17 +576,40 @@ public class TradingBotOnMovingTimeSeries {
 		// - or if the price earns more than 369%
 
 		//
-		Rule sellingRule = new CrossedDownIndicatorRule(macd, emaSignal)
-				.or(new CrossedDownIndicatorRule(bbuSMA, closePrice)) // bollinger's watchdog
-				.or(new CrossedDownIndicatorRule(ema, ku))// keltner's watchdog
-				.or(new OverIndicatorRule(rsi, Decimal.valueOf(80)).or(new OverIndicatorRule(srsi, srsiThresholdHigh)))
+
+		if (sellingRulesCatalog.size() == 0) {
+			sellingRulesCatalog.put(1, new CrossedDownIndicatorRule(awesome, Decimal.ZERO));
+			sellingRulesCatalog.put(2, new CrossedDownIndicatorRule(macd, emaSignal));
+			sellingRulesCatalog.put(3, new CrossedDownIndicatorRule(bbuSMA, closePrice));
+			sellingRulesCatalog.put(4, new CrossedDownIndicatorRule(ema, ku));
+		}
+
+		for (int key = 1; key < sellingRulesCatalog.size(); key++) {
+			if (sellingRulesCatalog.get(key).isSatisfied(index)) {
+				sellingRulesHistory.put(key, index);
+			}
+		}
+
+		Rule sellingRule = sellingRuleBasic
+				.or((new CrossedDownIndicatorRule(macd, emaSignal).or(new CrossedDownIndicatorRule(bbuSMA, closePrice)) // bollinger's
+																														// watchdog
+						.or(new CrossedDownIndicatorRule(ema, ku))// keltner's watchdog
+						.or(new OverIndicatorRule(rsi, Decimal.valueOf(80)))
+						.or(new StopLossRule(closePrice, Decimal.valueOf("0.0036")))));
+
+		/*
+		 * Rule r6 = new OverIndicatorRule(rsi, Decimal.valueOf(80));
+		 * r6.isSatisfied(index);
+		 */
+
+		// .and(new OverIndicatorRule(srsi, srsiThresholdHigh))
+
 		// .or(new CrossedDownIndicatorRule(bbuSMA, closePrice)) // bollinger's watchdog
 		// .or(new CrossedDownIndicatorRule(ema, ku)// keltner's watchdog
 		// .or(new IsHighestRule(srsi, 6)) // within 6 last ticks
 		// .or(new OverIndicatorRule(srsi, srsiThresholdHigh))
 		// .or(new StopLossRule(closePrice, Decimal.valueOf("0.0036")))
 		// .or(new StopGainRule(closePrice, Decimal.valueOf("369"))))
-		;
 
 		// trend was changed to downwards OR still downwards trend
 		// sellingRule = sellingRule.and(new UnderIndicatorRule(macdOscillator,
@@ -474,7 +618,7 @@ public class TradingBotOnMovingTimeSeries {
 		// Decimal.ZERO.minus(Decimal.THREE))))
 
 		// Running our juicy trading strategy...
-		Strategy buySellSignals = new BaseStrategy(buyingRule, sellingRule);
+		Strategy buySellSignals = new BaseStrategy(buyingRule, sellingRule, 3);
 		return buySellSignals;
 	}
 
@@ -829,13 +973,16 @@ public class TradingBotOnMovingTimeSeries {
 
 	public static void main(String[] args) throws InterruptedException {
 
+		// Loading the Logback configuration
+		loadLoggerConfiguration();
+
 		System.out.println("********************** Initialization **********************");
 
 		/*
 		 * SqlTradesLoader.setTicksPerSecond(1); run("QTUMBTC", 1000);
 		 */
-		String instrument = "QTUMBTC";
-		// String instrument = "XRPBTC";
+		// String instrument = "QTUMBTC";
+		String instrument = "XRPBTC";
 		TradingBotOnMovingTimeSeries bot = new TradingBotOnMovingTimeSeries();
 		bot.initializeAggTradesCache(instrument);
 		bot.startAggTradesEventStreaming(instrument, 5000);// max number of ticks

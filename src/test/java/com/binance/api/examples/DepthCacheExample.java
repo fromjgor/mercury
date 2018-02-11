@@ -3,6 +3,7 @@ package com.binance.api.examples;
 import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.BinanceApiWebSocketClient;
+import com.binance.api.client.domain.market.CandlestickInterval;
 import com.binance.api.client.domain.market.OrderBook;
 import com.binance.api.client.domain.market.OrderBookEntry;
 import com.binance.api.client.mercury.DeptCacheDumpDb;
@@ -13,6 +14,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.TreeMap;
 
 /**
@@ -65,7 +68,11 @@ public class DepthCacheExample {
 		BinanceApiWebSocketClient client = factory.newWebSocketClient();
 
 		client.onDepthEvent(symbol.toLowerCase(), response -> {
-			if (response.getUpdateId() > lastUpdateId) {
+
+			if (response == null) {
+				startDepthEventStreaming(symbol, orderBook);
+				return;
+			} else if (response.getUpdateId() > lastUpdateId) {
 				// System.out.println(response);
 				lastUpdateId = response.getUpdateId();
 				updateOrderBook(getAsks(), response.getAsks());
@@ -229,9 +236,42 @@ public class DepthCacheExample {
 	}
 
 	public static void main(String[] args) {
-		/*
-		 * new DepthCacheExample("ETHBTC"); new DepthCacheExample("IOTAETH");
+
+		/**
+		 * Simulate a rest client activity to keep the connection alive by sending a
+		 * ping twice per hour
 		 */
-		new DepthCacheExample("IOTABTC");
+		TimerTask connectivityTest = new TimerTask() {
+
+			@Override
+			public void run() {
+				BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance();
+				BinanceApiRestClient client = factory.newRestClient();
+
+				// Keep connection alive
+				client.ping();
+			}
+		};
+
+		Timer timer = new Timer();
+
+		long period = 1000 * 60 * 60 / 2;// milliseconds_per_second*seconds_per_minute*minutes_per_hour/2
+		long delay = period;
+
+		/**
+		 * twice per hour
+		 * 
+		 */
+		timer.scheduleAtFixedRate(connectivityTest, delay, period);
+
+		/************************************************************
+		 * do the needful
+		 ***********************************************************/
+		String[] myFavoritesBTC = new String[] { "QTUM"/* ,"NEO", "IOTA", "FUEL", "ETH", "BNB" */ };
+		for (String symbol : myFavoritesBTC) {
+			String pair = symbol + "BTC";
+			new DepthCacheExample(pair);
+		}
+
 	}
 }
